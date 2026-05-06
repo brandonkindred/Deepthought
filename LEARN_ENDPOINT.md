@@ -98,7 +98,7 @@ flowchart LR
     subgraph Deepthought
         uc1(["Provide feedback<br/>for a prior prediction"])
         uc2(["Update edge weights<br/>via Q-learning"])
-        uc3(["Record desired token<br/>on MemoryRecord"])
+        uc3(["Create HAS_RELATED_TOKEN edge<br/>if pair is new"])
     end
     actor --> uc1
     uc1 -. includes .-> uc2
@@ -106,7 +106,7 @@ flowchart LR
 ```
 
 **Preconditions:** A `MemoryRecord` was created by a prior `POST /rl/predict` call and the client has its `memory_id`.
-**Postconditions:** Every `(input_token)-[HAS_RELATED_TOKEN]->(output_token)` edge that contributed to the prediction has its `weight` updated; the `MemoryRecord` has its `desired_token` set to the actual token.
+**Postconditions:** Every `(input_token)-[HAS_RELATED_TOKEN]->(output_token)` edge that contributed to the prediction has its `weight` updated. (The `MemoryRecord` itself is *not* re-saved during learn — see §10 for the in-memory-only `setDesiredToken` quirk.)
 
 ### Secondary use case — bootstrap an unseen input→output pair
 
@@ -274,13 +274,12 @@ graph LR
 
     T1 -- "HAS_RELATED_TOKEN<br/>weight: double" --> T2
     M  -- "PREDICTED" --> T2
-    M  -- "DESIRED_TOKEN" --> T2
     M  -- "PREDICTION<br/>weight: double" --> T2
 ```
 
-- **`HAS_RELATED_TOKEN`** edges are the learnable weights — they are read and written on every learn call.
-- **`DESIRED_TOKEN`** is set on the `MemoryRecord` for every input/output pair processed (`Brain.java:127`). It records the ground truth that produced the update.
+- **`HAS_RELATED_TOKEN`** edges are the learnable weights — they are read and written on every learn call. This is the *only* relationship type that `/rl/learn` writes to Neo4j.
 - **`PREDICTED`** and **`PREDICTION`** are written by `/rl/predict` and only *read* during learn.
+- **`DESIRED_TOKEN`** — `Brain.learn` calls `memory.setDesiredToken(actual_token)` on the in-memory `MemoryRecord` (`Brain.java:127`), but **never calls `memory_repo.save(memory)`**, so this relationship is *not* persisted to Neo4j today. The mutation is effectively dead code; see §10. The schema diagram above intentionally omits it for that reason.
 
 ### Cypher executed during a learn call
 
@@ -308,8 +307,9 @@ Suppose `MemoryRecord 42` has `input_token_values = ["click"]`, `output_token_va
 (click) -[HAS_RELATED_TOKEN {weight: 0.51}]-> (BUTTON)   # 0.30 + 0.1·(2.0 + 0.1) = 0.51, then |…|
 (click) -[HAS_RELATED_TOKEN {weight: 0.36}]-> (LINK)     # 0.55 + 0.1·(-2.0 + 0.1) = 0.36, then |…|
 (MemoryRecord 42) -[PREDICTED]-> (BUTTON)
-(MemoryRecord 42) -[DESIRED_TOKEN]-> (BUTTON)            # newly written
 ```
+
+Only the two `HAS_RELATED_TOKEN` weights change. `Brain.learn` does call `memory.setDesiredToken(actual_token)` in memory, but never re-saves the `MemoryRecord`, so no `DESIRED_TOKEN` relationship is written (see §10).
 
 The reward for the `LINK` row is −2.0 because `output_key="LINK"` is not the actual token; for the `BUTTON` row it is +2.0 because `output_key`, `predicted_token`, and `actual_token` all match.
 
@@ -379,12 +379,13 @@ The next `/rl/predict` involving that pair will recreate the edge in `Brain.gene
 
 These are observations from reading the code; treat them as starting points for future PRs rather than bugs to fix in passing.
 
-1. **`Math.abs` on the Q update** (`Brain.java:141`) prevents weights from going negative but can also flip the sign of intended punishment — see §6 caveat.
-2. **`estimated_reward` is hard-coded to 1.0** (`Brain.java:93`). Classical Q-learning derives this from the max Q value of the successor state; here `γ · Q_future` is a constant `0.1`.
-3. **Unreachable `else` branch** (`Brain.java:118-123`). The preceding `else if` at line 114 already covers `output_key != actual_token`, so the trailing `else` (reward 0.0) is dead code.
-4. **Implicit token persistence.** The controller (`ReinforcementLearningController.java:189`) builds a new transient `Token` when `findByValue` returns null and passes it to `brain.learn`. The token is only persisted later by `createWeightedConnection`; if no edge needs to be created the token is silently dropped.
-5. **One save per edge update.** `token_weight_repo.save` runs inside the inner loop (`Brain.java:146`), so a memory with N inputs × M outputs causes N·M Bolt round-trips. Batched saves would be a worthwhile optimisation for larger inputs.
-6. **`/rl/train` is a stub.** It builds a `Vocabulary` in memory but never persists it (`Brain.java:254-282`). Don't confuse it with `/rl/learn` — only `/rl/learn` writes weights.
+1. **`setDesiredToken` is never persisted.** `Brain.learn` calls `memory.setDesiredToken(actual_token)` at `Brain.java:127` but never invokes `memory_repo.save(memory)`. With Spring Data Neo4j the entity must be explicitly saved, so the `DESIRED_TOKEN` relationship is built only in the request-scoped Java object and discarded when the call returns. If the intent is to store ground truth alongside the prediction, a `memory_repo.save(memory)` call after the inner loop would fix it.
+2. **`Math.abs` on the Q update** (`Brain.java:141`) prevents weights from going negative but can also flip the sign of intended punishment — see §6 caveat.
+3. **`estimated_reward` is hard-coded to 1.0** (`Brain.java:93`). Classical Q-learning derives this from the max Q value of the successor state; here `γ · Q_future` is a constant `0.1`.
+4. **Unreachable `else` branch** (`Brain.java:118-123`). The preceding `else if` at line 114 already covers `output_key != actual_token`, so the trailing `else` (reward 0.0) is dead code.
+5. **Implicit token persistence.** The controller (`ReinforcementLearningController.java:189`) builds a new transient `Token` when `findByValue` returns null and passes it to `brain.learn`. The token is only persisted later by `createWeightedConnection`; if no edge needs to be created the token is silently dropped.
+6. **One save per edge update.** `token_weight_repo.save` runs inside the inner loop (`Brain.java:146`), so a memory with N inputs × M outputs causes N·M Bolt round-trips. Batched saves would be a worthwhile optimisation for larger inputs.
+7. **`/rl/train` is a stub.** It builds a `Vocabulary` in memory but never persists it (`Brain.java:254-282`). Don't confuse it with `/rl/learn` — only `/rl/learn` writes weights.
 
 ---
 
