@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/deepthought-banner.png" alt="Deepthought — a graph-based reasoning engine" width="100%" />
+
 # Deepthought
 
 **A graph-based reasoning engine that distributes neural network weights across a knowledge graph — no GPU required.**
@@ -22,6 +24,16 @@
 [**Contributing**](#contributing)
 
 </div>
+
+---
+
+## About the Name
+
+I named this project after **Deep Thought**, the second-greatest computer in all of time and space from Douglas Adams' *The Hitchhiker's Guide to the Galaxy*. In the novel, a pan-dimensional civilization builds Deep Thought to compute the Answer to the Ultimate Question of Life, the Universe, and Everything. After 7.5 million years of contemplation, it returns the now-famous answer: **42**. Its creators then realize they never actually knew what the Question was.
+
+I picked the name because it captures what I want this project to do: build a machine that *reasons* rather than just computes, and that can show you *why* it arrived at an answer. It also reminds me that an answer without a well-formed question isn't worth much, no matter how many cycles you spent on it.
+
+I'm an unapologetic fan of the series. Bring a towel.
 
 ---
 
