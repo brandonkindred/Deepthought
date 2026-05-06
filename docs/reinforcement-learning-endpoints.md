@@ -508,7 +508,7 @@ turns into `0.14`. That is the quirk called out in §6.2.
 | `/rl/predict` output label not in DB | New (transient) `Token` is created and used; `[`/`]` chars are stripped. |
 | `/rl/predict` empty `prediction` array | `getMaxPredictionIndex` throws `IllegalArgumentException` → 500. |
 | `/rl/learn` unknown `memory_id` | `404 Not Found`, body message `"Memory record not found for id <id>"`. |
-| `/rl/learn` unknown `token_value` | No validation error and no persistence. The transient `Token` is used only for reward comparison and assigned to `memory.desired_token` (unsaved). If the value is not already in the memory's `output_token_keys`, no node or edge for it is created. |
+| `/rl/learn` unknown `token_value` | No validation error and no node is persisted for the supplied token. **Edge weights are still mutated**: `Brain.learn` loops over every existing `(input_key, output_key)` pair from the memory and applies a Q-update. With an unknown actual label, every `output_key` falls into the `output_key != actual_token` branch and receives reward `−1.0` (if it equals the originally predicted token) or `−2.0` (otherwise), so all candidate edges for that memory are penalized. Treat typo/unknown labels as destructive, not no-ops. |
 | Missing required query params | Spring binding error → `400 Bad Request`. |
 | Q-learning weight that would go negative | Clamped to non-negative via `Math.abs`. |
 | Per-edge writes | Not batched — `O(|input| × |output|)` Neo4j round-trips per `/rl/learn`. |
@@ -576,5 +576,5 @@ How to confirm this document matches the running system:
 | Domain entities | `src/main/java/com/deepthought/models/{Token,MemoryRecord,Vocabulary}.java` |
 | Edge entities | `src/main/java/com/deepthought/models/edges/{TokenWeight,Prediction,TokenPolicy}.java` |
 | Repositories (Cypher) | `src/main/java/com/deepthought/models/repository/*.java` |
-| Neo4j config | `src/main/java/com/qanairy/config/Neo4jConfiguration.java` |
-| Application bootstrap | `src/main/java/com/qanairy/deepthought/App.java` |
+| Neo4j config | `src/main/java/com/deepthought/config/Neo4jConfiguration.java` |
+| Application bootstrap | `src/main/java/com/deepthought/deepthought/App.java` (declares `package com.qanairy.deepthought;`) |
