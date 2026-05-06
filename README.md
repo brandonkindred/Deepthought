@@ -27,6 +27,16 @@
 
 ---
 
+## About the Name
+
+The project is named after **Deep Thought**, the second-greatest computer in all of time and space from Douglas Adams' *The Hitchhiker's Guide to the Galaxy*. In the novel, a pan-dimensional civilization builds Deep Thought to compute the Answer to the Ultimate Question of Life, the Universe, and Everything. After 7.5 million years of contemplation, it returns the now-famous answer: **42** — only for its creators to realize they never actually knew what the Question was.
+
+The name is a wink at what this project is trying to do — build a machine that *reasons* rather than just computes, and that can show you *why* it arrived at an answer. It's also a reminder that an answer without a well-formed question isn't worth much, no matter how many cycles you spent on it.
+
+Plus, the author is an unapologetic fan of the series. Bring a towel.
+
+---
+
 ## Table of Contents
 
 - [Why Deepthought?](#why-deepthought)
