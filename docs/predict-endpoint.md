@@ -290,18 +290,25 @@ sequenceDiagram
 
 ### 5.4 Response shape
 
-The endpoint returns the persisted `MemoryRecord` as JSON. Notable fields:
+The endpoint returns the persisted `MemoryRecord` as JSON. Spring Boot uses
+Jackson with default settings (no naming-strategy override is configured),
+so JSON field names are derived from the Java getter names — they are
+**camelCase**, not the snake_case private-field names. Notable fields:
 
-- `id` — the auto-generated Neo4j node id.
-- `date` — set in the `MemoryRecord` constructor.
-- `predicted_token` — the candidate `Token` chosen by `argmax`.
-- `input_token_values` (`List<String>`) — scrubbed, deduped input tokens.
-- `output_token_values` (`String[]`) — the output labels exactly as
-  scored.
-- `policy_matrix_json` — Gson-serialized `double[][]`, shape
-  `[input.size()][output.size()]`.
-- `predictions` — list of `Prediction` edge objects, each carrying the
-  normalized probability for its `result_token`.
+| JSON field | Source getter | Type / notes |
+|---|---|---|
+| `ID` | `getID()` | Auto-generated Neo4j node id (capitalized — `Introspector.decapitalize` preserves consecutive caps in `getID`). |
+| `date` | `getDate()` | Set in the `MemoryRecord` constructor. |
+| `predictedToken` | `getPredictedToken()` | The candidate `Token` chosen by `argmax`. |
+| `inputTokenValues` | `getInputTokenValues()` | `List<String>` — scrubbed, deduped input tokens. |
+| `outputTokenKeys` | `getOutputTokenKeys()` | `String[]` — output labels exactly as scored (note the *Keys* suffix on the getter despite the field being `output_token_values`). |
+| `policyMatrix` | `getPolicyMatrix()` | `double[][]` shape `[input.size()][output.size()]`. The getter deserializes from the private `policy_matrix_json` field via Gson, so the JSON contains the matrix itself, not the JSON string. |
+| `predictions` | `getPredictions()` | List of `Prediction` edge objects, each carrying the normalized probability for its `result_token`. |
+| `desiredToken` | `getDesiredToken()` | `null` from `/rl/predict`; only set by `/rl/learn`. |
+
+The snake_case names (`predicted_token`, `input_token_values`,
+`output_token_values`, `policy_matrix_json`) appear in the **Java source**
+and as **Neo4j node properties**, but **not** in the HTTP response body.
 
 ---
 
@@ -337,7 +344,8 @@ How to confirm this document matches the running system:
    ```
 
    Expect a `MemoryRecord` JSON with a `predictions` array of length 2, a
-   `predicted_token`, and a non-empty `policy_matrix_json`.
+   `predictedToken` object, and a `policyMatrix` 2D array. Capture the
+   returned `ID` value as `MEMORY_ID` for the next step.
 4. In Neo4j Browser, confirm the `PREDICTION` edges from step 3 exist:
 
    ```cypher
