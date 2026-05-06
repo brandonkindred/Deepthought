@@ -27,8 +27,12 @@ The two endpoints work as a pair:
 | `POST /rl/predict` | Score a set of candidate output labels for a given input | `MemoryRecord` (JSON) — includes the id needed to learn later |
 | `POST /rl/learn`   | Apply Q-learning updates given an actual label and a prior `memory_id` | `202 Accepted`, no body |
 
-A third endpoint, `POST /rl/train`, is a labeled-data convenience wrapper and
-is not the focus of this document.
+A third endpoint, `POST /rl/train`, exists in the controller but is currently
+a stub: it decomposes the JSON input and calls `Brain.train`, which builds a
+local in-memory `Vocabulary` and a transient state vector but does **not**
+invoke `predict`, `Q-learn`, any repository, or any weight persistence
+(`Brain.java:254-282`). It is not part of the predict→learn loop today and
+is out of scope for this document.
 
 ---
 
@@ -139,20 +143,16 @@ flowchart TB
 
     UC1(("Request Prediction"))
     UC2(("Submit Feedback"))
-    UC3(("Train on Labeled Data"))
     UC4(("Persist MemoryRecord"))
     UC5(("Apply Q-Learning Update"))
     UC6(("Decompose JSON Input"))
 
     Client --> UC1
     Operator --> UC2
-    Operator --> UC3
 
     UC1 -. include .-> UC4
     UC1 -. include .-> UC6
     UC2 -. include .-> UC5
-    UC3 -. include .-> UC5
-    UC3 -. include .-> UC6
 ```
 
 **Actors**
@@ -168,11 +168,12 @@ flowchart TB
   distribution over output labels.
 - *Submit Feedback* — supplies the actual label after the fact; triggers the
   Q-learning update against the policy graph.
-- *Train on Labeled Data* — single-shot prediction + feedback for known
-  examples (out of scope for this doc).
-- *Decompose JSON Input* — included by both prediction-producing flows.
+- *Decompose JSON Input* — included by *Request Prediction*.
 - *Persist MemoryRecord* — required for any future feedback to be applicable.
 - *Apply Q-Learning Update* — modifies `TokenWeight` edges in the graph.
+
+`/rl/train` is intentionally **not** modeled here: in its current form it does
+not update the model (see §1).
 
 ---
 
@@ -309,9 +310,14 @@ Source: `ReinforcementLearningController.java:176-196`.
    for id " + memory_id)` → client sees `404`. (controller `:183-186`).
 2. **Resolve the actual `Token`** — construct `new Token(token_value)`, then
    try `TokenRepository.findByValue`. If a persisted token exists, use it;
-   otherwise the transient instance is passed through (no save here — the
-   token is materialized later as a side effect of edge creation).
-   (controller `:189-193`).
+   otherwise the transient instance is passed through. **The transient token
+   is never persisted by `/rl/learn`.** Inside `Brain.learn` it is used only
+   for reward comparison and assigned to `memory.desired_token` (which is
+   not re-saved). Edges created by `Brain.learn` connect
+   `(input_key)→(output_key)` from the original memory; they do not
+   reference `actual_token` unless its value happens to coincide with one of
+   the original `output_token_keys`. (controller `:189-193`,
+   `Brain.java:126-147`).
 3. **Delegate to `Brain.learn(memory_id, actual_token)`**
    (`Brain.java:75-149`). Everything below happens inside `Brain.learn`.
 4. **Reload the memory** inside `Brain.learn` via
@@ -502,7 +508,7 @@ turns into `0.14`. That is the quirk called out in §6.2.
 | `/rl/predict` output label not in DB | New (transient) `Token` is created and used; `[`/`]` chars are stripped. |
 | `/rl/predict` empty `prediction` array | `getMaxPredictionIndex` throws `IllegalArgumentException` → 500. |
 | `/rl/learn` unknown `memory_id` | `404 Not Found`, body message `"Memory record not found for id <id>"`. |
-| `/rl/learn` unknown `token_value` | New token is created implicitly when an edge is written; no validation error. |
+| `/rl/learn` unknown `token_value` | No validation error and no persistence. The transient `Token` is used only for reward comparison and assigned to `memory.desired_token` (unsaved). If the value is not already in the memory's `output_token_keys`, no node or edge for it is created. |
 | Missing required query params | Spring binding error → `400 Bad Request`. |
 | Q-learning weight that would go negative | Clamped to non-negative via `Math.abs`. |
 | Per-edge writes | Not batched — `O(|input| × |output|)` Neo4j round-trips per `/rl/learn`. |
