@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/deepthought-banner.png" alt="Deepthought — a graph-based reasoning engine" width="100%" />
+
 # Deepthought
 
 **A graph-based reasoning engine that distributes neural network weights across a knowledge graph — no GPU required.**
