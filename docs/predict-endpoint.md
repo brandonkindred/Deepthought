@@ -205,6 +205,13 @@ Source: `ReinforcementLearningController.java:71-164`.
    first; on `JSONException` it falls back to
    `DataDecomposer.decompose(String)`, which splits on whitespace.
    (`DataDecomposer.java:31-120`, controller `:76-83`).
+
+   > **Note on JSON tokenization.** `decompose(JSONObject)` iterates the
+   > object's keys but tokenizes only the corresponding **values** (line
+   > 37 reads the key for logging, line 39 reads the value, and every
+   > subsequent branch operates on `value`). Keys themselves are never
+   > turned into `Token`s. So `{"page":"login form"}` produces tokens
+   > `login` and `form` — not `page`.
 2. **Resolve output tokens** — `TokenRepository.findByValue(value)` is
    called once per label, with the **raw** label string (including any
    leading/trailing `[`/`]`). On a hit, the persisted `Token` is reused
@@ -343,11 +350,15 @@ How to confirm this document matches the running system:
 2. Open Swagger UI at <http://localhost:8080/swagger-ui.html> and confirm
    `POST /rl/predict` shows `input` (string) and `output_tokens` (array)
    parameters as described in §5.1.
-3. Make a prediction:
+3. Make a prediction. The curl below uses a **plain-text** `input` so the
+   tokenization is unambiguous: `login` and `form` become input tokens
+   (whitespace split). A JSON input like `{"page":"login form"}` would
+   produce the same tokens — `page` is a key and is ignored, only the value
+   is tokenized.
 
    ```bash
    curl -X POST 'http://localhost:8080/rl/predict' \
-     --data-urlencode 'input={"page":"login"}' \
+     --data-urlencode 'input=login form' \
      --data-urlencode 'output_tokens=button' \
      --data-urlencode 'output_tokens=link'
    ```
@@ -363,11 +374,13 @@ How to confirm this document matches the running system:
    ORDER BY id(m) DESC LIMIT 25;
    ```
 
-5. Confirm the cold-start `HAS_RELATED_TOKEN` edges were materialized:
+5. Confirm the cold-start `HAS_RELATED_TOKEN` edges were materialized
+   between the input tokens (`login`, `form`) and the output tokens
+   (`button`, `link`):
 
    ```cypher
    MATCH (a:Token)-[w:HAS_RELATED_TOKEN]->(b:Token)
-   WHERE a.value IN ['page', 'login'] AND b.value IN ['button', 'link']
+   WHERE a.value IN ['login', 'form'] AND b.value IN ['button', 'link']
    RETURN a.value, w.weight, b.value;
    ```
 
