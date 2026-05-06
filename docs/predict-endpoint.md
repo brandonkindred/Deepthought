@@ -205,9 +205,18 @@ Source: `ReinforcementLearningController.java:71-164`.
    first; on `JSONException` it falls back to
    `DataDecomposer.decompose(String)`, which splits on whitespace.
    (`DataDecomposer.java:31-120`, controller `:76-83`).
-2. **Resolve output tokens** — `TokenRepository.findByValue` for each label;
-   absent labels become transient `Token` instances after stripping `[`/`]`.
-   (controller `:85-97`).
+2. **Resolve output tokens** — `TokenRepository.findByValue(value)` is
+   called once per label, with the **raw** label string (including any
+   leading/trailing `[`/`]`). On a hit, the persisted `Token` is reused
+   as-is. Only on a miss does the code strip `[`/`]` characters and
+   construct a new transient `Token` from the cleaned value. (controller
+   `:85-97`).
+
+   > **Caveat.** Because the lookup runs *before* stripping, a request
+   > like `output_tokens=[button]` will **not** reuse an existing
+   > `Token{value:"button"}` — it will fall through to the miss branch
+   > and create a new transient `Token{value:"button"}` (after
+   > stripping). Pass labels without brackets to hit the cache.
 3. **Scrub inputs** — drop nulls, the literal string `"null"`, blanks,
    duplicates, and any input token whose value matches an output label
    (case-insensitive). (controller `:104-120`).
@@ -317,7 +326,7 @@ and as **Neo4j node properties**, but **not** in the HTTP response body.
 | Case | Behavior |
 |---|---|
 | `input` is not valid JSON | Falls back to whitespace tokenization. No error. (`controller:76-83`) |
-| `output_tokens` label not in DB | New transient `Token` is constructed; `[`/`]` characters are stripped before lookup. The token is saved as a side effect of edge creation in step 4. (`controller:85-97`) |
+| `output_tokens` label not in DB | `findByValue(value)` is called with the **raw** label first; only after a miss are `[`/`]` characters stripped and a new transient `Token` constructed from the cleaned value. The token is saved as a side effect of edge creation in step 4. Note the order: a label like `[button]` will not match a stored `Token{value:"button"}` because the lookup runs before stripping. (`controller:85-97`) |
 | Empty `prediction` array | `getMaxPredictionIndex` throws `IllegalArgumentException` → 500. (`controller:198-212`) |
 | Missing required query params | Spring binding error → `400 Bad Request`. |
 | Duplicate or whitespace-only input tokens | Dropped during the scrub pass. (`controller:104-120`) |
