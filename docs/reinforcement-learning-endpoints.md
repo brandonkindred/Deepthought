@@ -43,9 +43,9 @@ would use; consuming that id is **not** part of this document.
 flowchart LR
     Client["Client Application"]
     subgraph Spring["Spring Boot App (com.qanairy.deepthought.App)"]
-        Controller["ReinforcementLearningController<br/>com.deepthought.api"]
-        Decomposer["DataDecomposer<br/>com.deepthought.db"]
-        Brain["Brain<br/>com.deepthought.brain<br/>(generatePolicy, predict)"]
+        Controller["ReinforcementLearningController<br/>com.qanairy.api"]
+        Decomposer["DataDecomposer<br/>com.qanairy.db"]
+        Brain["Brain<br/>com.qanairy.brain<br/>(generatePolicy, predict)"]
         TokenRepo["TokenRepository"]
         WeightRepo["TokenWeightRepository"]
         MemRepo["MemoryRecordRepository"]
@@ -66,15 +66,23 @@ flowchart LR
     PredRepo --> Neo4j
 ```
 
-**Package layout note.** `App.java` component-scans both `com.deepthought` and
-`com.qanairy`, so classes in either root are wired into the Spring context.
-The controller is referenced under `com.qanairy.api` in `CLAUDE.md`, but the
-file actually lives at
-`src/main/java/com/deepthought/api/ReinforcementLearningController.java`.
-A few classes (e.g. `QLearn.java`, `App.java`) declare a `com.qanairy.*`
-package while sitting on disk under `com/deepthought/...` — a known
-package/path inconsistency that does not affect runtime because Spring
-scans both roots.
+**Package layout note.** Use the **package declaration** (not the filesystem
+path) when importing or searching for these classes:
+
+| Class | Package declaration | Filesystem path |
+|---|---|---|
+| `ReinforcementLearningController` | `com.qanairy.api` | `src/main/java/com/deepthought/api/ReinforcementLearningController.java` |
+| `DataDecomposer` | `com.qanairy.db` | `src/main/java/com/deepthought/db/DataDecomposer.java` |
+| `Brain` | `com.qanairy.brain` | `src/main/java/com/deepthought/brain/Brain.java` |
+| `TokenVector` | `com.qanairy.brain` | `src/main/java/com/deepthought/brain/TokenVector.java` |
+| `App` | `com.qanairy.deepthought` | `src/main/java/com/deepthought/deepthought/App.java` |
+
+`App.java` declares
+`@ComponentScan(basePackages = {"com.deepthought","com.qanairy"})`, so both
+roots are wired into the Spring context and this divergence does not affect
+runtime. The labels on the architecture diagram above use the package
+declarations, since that is what `import` statements and IDE search target.
+Filesystem paths in the §8 source map use the on-disk locations.
 
 ---
 
