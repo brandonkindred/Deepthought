@@ -337,6 +337,7 @@ and as **Neo4j node properties**, but **not** in the HTTP response body.
 | Empty `prediction` array | `getMaxPredictionIndex` throws `IllegalArgumentException` → 500. (`controller:198-212`) |
 | Missing required query params | Spring binding error → `400 Bad Request`. |
 | Duplicate or whitespace-only input tokens | Dropped during the scrub pass. (`controller:104-120`) |
+| **All input tokens scrubbed away** | The request **fails with 500**. `Brain.generatePolicy` returns a `double[0][output.size()]` matrix, and `Brain.predict` immediately dereferences `policy[0]` to compute the column count (`Brain.java:45`), throwing `ArrayIndexOutOfBoundsException`. Triggers: blank `input`, JSON with no scalar values (e.g. `{}`), or every input token matching an output label (case-insensitive) and being scrubbed at `controller:104-120`. There is no graceful empty-prediction path. |
 | Cold-start (no existing `HAS_RELATED_TOKEN` edges) | Random weights are generated and persisted; subsequent calls reuse them. The very first call therefore produces effectively random rankings *and* permanently materializes those weights. (`Brain.java:229-242`) |
 | Per-cell writes in `generatePolicy` | Not batched — `O(|input| × |output|)` Neo4j round-trips for a cold-start prediction. |
 
