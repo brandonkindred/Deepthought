@@ -297,7 +297,7 @@ so JSON field names are derived from the Java getter names — they are
 
 | JSON field | Source getter | Type / notes |
 |---|---|---|
-| `ID` | `getID()` | Auto-generated Neo4j node id (capitalized — `Introspector.decapitalize` preserves consecutive caps in `getID`). |
+| `id` | `getID()` | Auto-generated Neo4j node id. Lowercase: Jackson's default property-naming uses the legacy mangling algorithm (`MapperFeature.USE_STD_BEAN_NAMING` is **disabled** by default and Spring Boot does not enable it), which mangles `getID` → `id`. With `USE_STD_BEAN_NAMING = true` it would be `ID`. |
 | `date` | `getDate()` | Set in the `MemoryRecord` constructor. |
 | `predictedToken` | `getPredictedToken()` | The candidate `Token` chosen by `argmax`. |
 | `inputTokenValues` | `getInputTokenValues()` | `List<String>` — scrubbed, deduped input tokens. |
@@ -345,7 +345,7 @@ How to confirm this document matches the running system:
 
    Expect a `MemoryRecord` JSON with a `predictions` array of length 2, a
    `predictedToken` object, and a `policyMatrix` 2D array. Capture the
-   returned `ID` value as `MEMORY_ID` for the next step.
+   returned `id` value as `MEMORY_ID` for the next step.
 4. In Neo4j Browser, confirm the `PREDICTION` edges from step 3 exist:
 
    ```cypher
