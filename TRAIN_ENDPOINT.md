@@ -46,15 +46,17 @@ json_object={...}&label=GREETING
 ### Response
 
 - `200 OK` with empty body on success.
-- Spring's default error mapping is used for thrown exceptions:
+- The controller declares the following checked/unchecked exceptions on its signature but does **not** define an `@ExceptionHandler` or `@ControllerAdvice`. Consequently, every exception below falls through to Spring Boot's default handler and surfaces as `500 Internal Server Error`:
 
 | Exception | Typical cause | Default mapping |
 |-----------|---------------|-----------------|
-| `JSONException` | `json_object` is not valid JSON | `400 Bad Request` |
-| `IllegalArgumentException` | Reflection/decomposition rejects an input | `400 Bad Request` |
+| `JSONException` | `json_object` is not valid JSON | `500 Internal Server Error` |
+| `IllegalArgumentException` | Reflection/decomposition rejects an input | `500 Internal Server Error` |
 | `IllegalAccessException` | Reflection cannot read a field | `500 Internal Server Error` |
 | `NullPointerException` | Missing/null fields during decomposition | `500 Internal Server Error` |
 | `IOException` | Propagated I/O failure | `500 Internal Server Error` |
+
+> If clients need `400 Bad Request` for invalid input (recommended), add an `@ExceptionHandler` for `JSONException` / `IllegalArgumentException` (or a `@ControllerAdvice`) — neither exists today.
 
 ### Example
 
