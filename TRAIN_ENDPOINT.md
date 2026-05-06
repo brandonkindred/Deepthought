@@ -40,7 +40,7 @@ json_object={...}&label=GREETING
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
-| `json_object` | yes | `String` | A JSON document describing the training sample. May be nested objects, arrays, or primitives. |
+| `json_object` | yes | `String` | A JSON document describing the training sample. Top-level objects with primitive or nested-object values decompose correctly; **nested objects/arrays *inside* a `JSONArray` do not** — see §6.2 for the actual behavior. |
 | `label` | yes | `String` | The intended class label for the sample. *(Currently unused inside `Brain.train()`; see §10.)* |
 
 ### Response
@@ -110,10 +110,10 @@ The dashed line to Neo4j highlights that, while the broader system is graph-back
 ```mermaid
 flowchart TD
     A[HTTP Client] -->|POST /rl/train| B[Spring DispatcherServlet]
-    B --> C["ReinforcementLearningController.train()<br/>com.deepthought.api"]
-    C --> D["DataDecomposer.decompose(JSONObject)<br/>com.deepthought.db"]
-    C --> E["Brain.train(List&lt;Token&gt;, String)<br/>com.deepthought.brain"]
-    E --> F["Vocabulary<br/>com.deepthought.models"]
+    B --> C["ReinforcementLearningController.train()<br/>package: com.qanairy.api<br/>(file: src/main/java/com/deepthought/api/...)"]
+    C --> D["DataDecomposer.decompose(JSONObject)<br/>package: com.qanairy.db<br/>(file: src/main/java/com/deepthought/db/...)"]
+    C --> E["Brain.train(List&lt;Token&gt;, String)<br/>package: com.qanairy.brain<br/>(file: src/main/java/com/deepthought/brain/...)"]
+    E --> F["Vocabulary<br/>package: com.deepthought.models"]
     F --> G["addWord / appendToVocabulary / getTokens"]
 
     Neo4j[("Neo4j<br/>(SessionFactory)")]:::ext
@@ -122,7 +122,7 @@ flowchart TD
     classDef ext fill:#eee,stroke:#999,stroke-dasharray: 4 4,color:#666;
 ```
 
-Spring component-scans both `com.deepthought` and `com.qanairy` (see `App.java`). The `Brain` bean is field-injected into the controller via `@Autowired`.
+> **Heads-up: package vs. directory mismatch.** The first three classes physically live under `src/main/java/com/deepthought/...`, but their `package` declarations read `com.qanairy.api`, `com.qanairy.db`, and `com.qanairy.brain`. Their fully-qualified names are therefore `com.qanairy.*` (used in imports), while the on-disk paths use `com/deepthought/`. Spring's `@ComponentScan` covers both root packages (see `App.java`).
 
 ---
 
@@ -213,8 +213,9 @@ The decomposer walks the JSON recursively and emits a flat `List<Token>` whose o
 | `:51-57` | `ArrayList` | Delegates to `decomposeArrayList(...)` (`:284-296`) |
 | `:62-70` | `String[]` | Each element becomes a `new Token(word)` |
 | `:71-77` | `Object[]` | Delegates to `decomposeObjectArray(...)` (`:264-274`) |
-| `:78-84` | `JSONArray` | For each element, recurses into `decompose(...)` |
+| `:78-84` | `JSONArray` | Iterates and calls `decompose(array.get(idx).toString())` — i.e. converts each element to a `String` and dispatches to the **`decompose(String)`** overload at `:110-120`, which **only whitespace-splits**. So a nested `JSONObject` inside a `JSONArray` is *not* recursively parsed; the entire serialized form (e.g. `{"name":"hello world"}`) is fed through `String.split("\\s+")`, yielding tokens like `{"name":"hello` and `world"}`. This is almost certainly a latent bug — callers should not rely on nested-array decomposition. |
 | `:85-92` | string scalar | `value.toString().split("\\s+")` and emits `new Token(word)` per token |
+| (siblings) | `decompose(String)` at `:110-120`; `decompose(Object)` at `:129+` (reflective field walk) | Other overloads referenced by the table above |
 
 Key invariant: every leaf string value is **whitespace-tokenized**, so `"hello world"` produces two `Token`s rather than one.
 
@@ -419,7 +420,11 @@ for (Token vocab_token : vocabulary.getTokens()) {
 
 A reasonable interpretation is that the loop is half-finished scaffolding for a future feature (likely "build a single state vector across the vocabulary"). It currently does no useful work.
 
-### 10.4 Observable side effects
+### 10.4 Nested objects/arrays inside a `JSONArray` are not recursively decomposed
+
+The `JSONArray` branch at `DataDecomposer.java:78-83` calls `decompose(array.get(idx).toString())`, which dispatches to the `decompose(String)` overload at `:110-120`. That overload only does `value.split("\\s+")`. Consequently, an input like `{"items":[{"name":"hello world"}]}` is *not* recursively walked — the JSONObject is converted to its `toString()` form (`{"name":"hello world"}`) and tokenized as a string, producing tokens like `{"name":"hello`, `world"}`. Callers should not assume that nested-object decomposition works inside arrays.
+
+### 10.5 Observable side effects
 
 The only externally visible effects of a `/train` call are the four `log.info(...)` lines inside `Brain.train()`:
 
@@ -432,7 +437,7 @@ The only externally visible effects of a `/train` call are the four `log.info(..
 
 If you do not see these lines, the request never reached `Brain.train()`.
 
-### 10.5 Implications for callers
+### 10.6 Implications for callers
 
 - Calling `/train` repeatedly does **not** improve subsequent `/predict` results.
 - Calling `/train` does **not** seed the graph with vocabulary or tokens.
