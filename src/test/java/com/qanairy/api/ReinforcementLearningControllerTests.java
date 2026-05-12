@@ -272,4 +272,50 @@ public class ReinforcementLearningControllerTests {
 
 		controller.predict("{\"a\":\"word\"}", new String[] {});
 	}
+
+	@Test
+	public void predict_decomposesNestedJsonInput() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 1.0 } });
+		when(brain.predict(any())).thenReturn(new double[] { 1.0 });
+
+		controller.predict("{\"outer\":{\"inner\":\"deepvalue\"},\"sibling\":\"flatvalue\"}", new String[] { "out" });
+
+		ArgumentCaptor<MemoryRecord> memoryCaptor = ArgumentCaptor.forClass(MemoryRecord.class);
+		verify(memory_repo).save(memoryCaptor.capture());
+		List<String> inputs = memoryCaptor.getValue().getInputTokenValues();
+		assertTrue(inputs.contains("deepvalue"));
+		assertTrue(inputs.contains("flatvalue"));
+	}
+
+	@Test
+	public void predict_preservesMultipleScrubbedInputTokens() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 1.0 } });
+		when(brain.predict(any())).thenReturn(new double[] { 1.0 });
+
+		controller.predict("{\"a\":\"alpha\",\"b\":\"beta\",\"c\":\"gamma\"}", new String[] { "out" });
+
+		ArgumentCaptor<MemoryRecord> memoryCaptor = ArgumentCaptor.forClass(MemoryRecord.class);
+		verify(memory_repo).save(memoryCaptor.capture());
+		List<String> inputs = memoryCaptor.getValue().getInputTokenValues();
+		assertEquals(inputs.size(), 3);
+		assertTrue(inputs.contains("alpha"));
+		assertTrue(inputs.contains("beta"));
+		assertTrue(inputs.contains("gamma"));
+	}
+
+	@Test
+	public void predict_reusesExistingOutputTokenInstance() throws Exception {
+		Token existing = new Token("foo");
+		when(token_repo.findByValue("foo")).thenReturn(existing);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 1.0 } });
+		when(brain.predict(any())).thenReturn(new double[] { 1.0 });
+
+		MemoryRecord memory = controller.predict("{\"a\":\"x\"}", new String[] { "foo" });
+
+		assertTrue(memory.getPredictedToken() == existing);
+		assertEquals(memory.getPredictions().size(), 1);
+		assertTrue(memory.getPredictions().get(0).getToken() == existing);
+	}
 }
