@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -11,17 +12,19 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
+import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.deepthought.models.Token;
 import com.deepthought.models.MemoryRecord;
+import com.deepthought.models.edges.Prediction;
 import com.deepthought.models.repository.TokenRepository;
 import com.deepthought.models.repository.MemoryRecordRepository;
 import com.deepthought.models.repository.PredictionRepository;
@@ -77,7 +80,7 @@ public class ReinforcementLearningControllerTests {
 	}
 
 	@Test
-	public void learn_returns404WhenMemoryDoesNotExist() throws IOException, IllegalAccessException {
+	public void learn_returns404WhenMemoryDoesNotExist() throws Exception {
 		when(memory_repo.findById(999L)).thenReturn(Optional.empty());
 
 		try {
@@ -171,5 +174,102 @@ public class ReinforcementLearningControllerTests {
 
 		assertNotNull(memory);
 		assertEquals(Arrays.asList(memory.getOutputTokenKeys()), Arrays.asList("fresh"));
+	}
+
+	@Test
+	public void predict_persistsPredictionEdgeForEachOutputToken() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 0.1, 0.5, 0.4 } });
+		when(brain.predict(any())).thenReturn(new double[] { 0.1, 0.5, 0.4 });
+
+		MemoryRecord memory = controller.predict("{\"a\":\"word\"}", new String[] { "first", "second", "third" });
+
+		assertNotNull(memory);
+		assertEquals(memory.getPredictions().size(), 3);
+		verify(prediction_repo, times(3)).save(any(Prediction.class));
+		verify(memory_repo, times(1)).save(any(MemoryRecord.class));
+	}
+
+	@Test
+	public void predict_persistsMemoryRecordWithPolicyMatrixAndKeys() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		double[][] policy = new double[][] { { 0.25, 0.75 } };
+		when(brain.generatePolicy(any(), any())).thenReturn(policy);
+		when(brain.predict(any())).thenReturn(new double[] { 0.25, 0.75 });
+
+		controller.predict("{\"a\":\"word\"}", new String[] { "[alpha]", "beta" });
+
+		ArgumentCaptor<MemoryRecord> memoryCaptor = ArgumentCaptor.forClass(MemoryRecord.class);
+		verify(memory_repo).save(memoryCaptor.capture());
+		MemoryRecord saved = memoryCaptor.getValue();
+		assertTrue(Arrays.deepEquals(saved.getPolicyMatrix(), policy));
+		assertEquals(saved.getInputTokenValues(), Arrays.asList("word"));
+		assertEquals(Arrays.asList(saved.getOutputTokenKeys()), Arrays.asList("alpha", "beta"));
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void predict_scrubsInputTokenWhenItEqualsOutputTokenCaseInsensitively() throws Exception {
+		when(token_repo.findByValue("hello")).thenReturn(new Token("hello"));
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 1.0 } });
+		when(brain.predict(any())).thenReturn(new double[] { 1.0 });
+
+		controller.predict("{\"a\":\"Hello\"}", new String[] { "hello" });
+
+		ArgumentCaptor<List<Token>> inputCaptor = ArgumentCaptor.forClass(List.class);
+		verify(brain).generatePolicy(inputCaptor.capture(), any());
+		assertTrue(inputCaptor.getValue().isEmpty());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void predict_passesScrubbedInputsToBrainGeneratePolicy() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 1.0 } });
+		when(brain.predict(any())).thenReturn(new double[] { 1.0 });
+
+		controller.predict("{\"a\":\"keep\",\"b\":\"null\",\"c\":\"\"}", new String[] { "out" });
+
+		ArgumentCaptor<List<Token>> inputCaptor = ArgumentCaptor.forClass(List.class);
+		verify(brain).generatePolicy(inputCaptor.capture(), any());
+		List<Token> scrubbed = inputCaptor.getValue();
+		assertEquals(scrubbed.size(), 1);
+		assertEquals(scrubbed.get(0).getValue(), "keep");
+	}
+
+	@Test
+	public void predict_picksFirstIndexOnTiedProbabilities() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 0.5, 0.5 } });
+		when(brain.predict(any())).thenReturn(new double[] { 0.5, 0.5 });
+
+		MemoryRecord memory = controller.predict("{\"a\":\"word\"}", new String[] { "first", "second" });
+
+		assertNotNull(memory.getPredictedToken());
+		assertEquals(memory.getPredictedToken().getValue(), "first");
+	}
+
+	@Test
+	public void predict_predictionEdgeWeightsMatchBrainOutputInOrder() throws Exception {
+		when(token_repo.findByValue(any())).thenReturn(null);
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] { { 0.3, 0.7 } });
+		when(brain.predict(any())).thenReturn(new double[] { 0.3, 0.7 });
+
+		MemoryRecord memory = controller.predict("{\"a\":\"word\"}", new String[] { "low", "high" });
+
+		List<Prediction> edges = memory.getPredictions();
+		assertEquals(edges.size(), 2);
+		assertEquals(edges.get(0).getWeight(), 0.3);
+		assertEquals(edges.get(0).getToken().getValue(), "low");
+		assertEquals(edges.get(1).getWeight(), 0.7);
+		assertEquals(edges.get(1).getToken().getValue(), "high");
+	}
+
+	@Test(expectedExceptions = IllegalArgumentException.class)
+	public void predict_throwsWhenNoOutputLabelsProvided() throws Exception {
+		when(brain.generatePolicy(any(), any())).thenReturn(new double[][] {});
+		when(brain.predict(any())).thenReturn(new double[] {});
+
+		controller.predict("{\"a\":\"word\"}", new String[] {});
 	}
 }
