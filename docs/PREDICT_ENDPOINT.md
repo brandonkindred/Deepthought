@@ -42,10 +42,10 @@ would use; consuming that id is **not** part of this document.
 ```mermaid
 flowchart LR
     Client["Client Application"]
-    subgraph Spring["Spring Boot App (com.qanairy.deepthought.App)"]
-        Controller["ReinforcementLearningController<br/>com.qanairy.api"]
-        Decomposer["DataDecomposer<br/>com.qanairy.db"]
-        Brain["Brain<br/>com.qanairy.brain<br/>(generatePolicy, predict)"]
+    subgraph Spring["Spring Boot App (com.deepthought.App)"]
+        Controller["ReinforcementLearningController<br/>com.deepthought.api"]
+        Decomposer["DataDecomposer<br/>com.deepthought.db"]
+        Brain["Brain<br/>com.deepthought.brain<br/>(generatePolicy, predict)"]
         TokenRepo["TokenRepository"]
         WeightRepo["TokenWeightRepository"]
         MemRepo["MemoryRecordRepository"]
@@ -66,23 +66,18 @@ flowchart LR
     PredRepo --> Neo4j
 ```
 
-**Package layout note.** Use the **package declaration** (not the filesystem
-path) when importing or searching for these classes:
+**Package layout.** All production code lives under the single root package
+`com.deepthought.*`:
 
-| Class | Package declaration | Filesystem path |
+| Class | Package | Filesystem path |
 |---|---|---|
-| `ReinforcementLearningController` | `com.qanairy.api` | `src/main/java/com/deepthought/api/ReinforcementLearningController.java` |
-| `DataDecomposer` | `com.qanairy.db` | `src/main/java/com/deepthought/db/DataDecomposer.java` |
-| `Brain` | `com.qanairy.brain` | `src/main/java/com/deepthought/brain/Brain.java` |
-| `TokenVector` | `com.qanairy.brain` | `src/main/java/com/deepthought/brain/TokenVector.java` |
-| `App` | `com.qanairy.deepthought` | `src/main/java/com/deepthought/deepthought/App.java` |
+| `ReinforcementLearningController` | `com.deepthought.api` | `src/main/java/com/deepthought/api/ReinforcementLearningController.java` |
+| `DataDecomposer` | `com.deepthought.db` | `src/main/java/com/deepthought/db/DataDecomposer.java` |
+| `Brain` | `com.deepthought.brain` | `src/main/java/com/deepthought/brain/Brain.java` |
+| `TokenVector` | `com.deepthought.brain` | `src/main/java/com/deepthought/brain/TokenVector.java` |
+| `App` | `com.deepthought` | `src/main/java/com/deepthought/App.java` |
 
-`App.java` declares
-`@ComponentScan(basePackages = {"com.deepthought","com.qanairy"})`, so both
-roots are wired into the Spring context and this divergence does not affect
-runtime. The labels on the architecture diagram above use the package
-declarations, since that is what `import` statements and IDE search target.
-Filesystem paths in the §8 source map use the on-disk locations.
+`App.java` declares `@ComponentScan(basePackages = {"com.deepthought"})`.
 
 ---
 
@@ -402,4 +397,4 @@ How to confirm this document matches the running system:
 | Edge entities | `src/main/java/com/deepthought/models/edges/{TokenWeight,Prediction}.java` |
 | Repositories (Cypher) | `src/main/java/com/deepthought/models/repository/{Token,TokenWeight,MemoryRecord,Prediction}Repository.java` |
 | Neo4j config | `src/main/java/com/deepthought/config/Neo4jConfiguration.java` |
-| Application bootstrap | `src/main/java/com/deepthought/deepthought/App.java` (declares `package com.qanairy.deepthought;`) |
+| Application bootstrap | `src/main/java/com/deepthought/App.java` (declares `package com.deepthought;`) |

@@ -22,7 +22,7 @@ You are a test engineering specialist. Your goal is to write unit and integratio
 
 - **Framework**: TestNG 6.8.8 (not JUnit). Use `org.testng.annotations.Test`.
 - **Inclusion**: Annotate tests with `@Test(groups = "Regression")` so they run with `mvn test` (Surefire is configured with `<groups>Regression</groups>`).
-- **Packages**: Mirror production packages under `src/test/java` (e.g. `com.deepthought.models`, `Qanairy.deepthought`).
+- **Packages**: Mirror production packages under `src/test/java` (e.g. `com.deepthought`, `com.deepthought.models`, `com.deepthought.api`).
 - **Naming**: snake_case for variables/parameters; clear test method names that describe scenario and expected outcome.
 - **Spring**: Use `spring-boot-starter-test` for Spring context, MockMvc for controllers, and in-memory or test Neo4j when testing persistence.
 - **Coverage**: Prefer JaCoCo; ensure report includes both unit and integration test runs so coverage is aggregated.

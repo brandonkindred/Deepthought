@@ -381,28 +381,34 @@ src/
 │   │   │   └── PredictionRepository.java
 │   │   └── services/
 │   │       └── TokenService.java
-│   └── qanairy/                      # Application package
-│       ├── api/
-│       │   ├── ReinforcementLearningController.java
-│       │   └── ImageIngestionController.java
-│       ├── brain/
-│       │   ├── Brain.java            # Prediction & learning orchestrator
-│       │   ├── QLearn.java           # Q-learning algorithm
-│       │   ├── TokenVector.java      # Elastic vector construction
-│       │   ├── Predict.java
-│       │   └── ActionFactory.java
-│       ├── config/
-│       │   ├── ConfigService.java
-│       │   └── Neo4jConfiguration.java
-│       ├── db/
-│       │   ├── DataDecomposer.java   # JSON → Token list
-│       │   └── VocabularyWeights.java
-│       ├── deepthought/
-│       │   └── App.java              # Spring Boot entry point
-│       └── observableStructs/
-│           ├── ConcurrentNode.java
-│           ├── ObservableHash.java
-│           └── ObservableQueue.java
+│   ├── App.java                      # Spring Boot entry point
+│   ├── api/
+│   │   ├── ReinforcementLearningController.java
+│   │   ├── LanguageModelController.java
+│   │   ├── LogisticRegressionController.java
+│   │   ├── ImageIngestionController.java
+│   │   ├── TokenSample.java
+│   │   └── dto/ImageIngestRequest.java
+│   ├── brain/
+│   │   ├── Brain.java                # Prediction & learning orchestrator
+│   │   ├── QLearn.java               # Q-learning algorithm
+│   │   ├── TokenVector.java          # Elastic vector construction
+│   │   ├── Predict.java
+│   │   ├── ActionFactory.java
+│   │   ├── LanguageModelService.java
+│   │   └── LogisticRegressionService.java
+│   ├── config/
+│   │   ├── ConfigService.java
+│   │   └── Neo4jConfiguration.java
+│   ├── db/
+│   │   ├── DataDecomposer.java       # JSON → Token list
+│   │   └── VocabularyWeights.java
+│   ├── image/
+│   │   └── ImageProcessingService.java
+│   └── observableStructs/
+│       ├── ConcurrentNode.java
+│       ├── ObservableHash.java
+│       └── ObservableQueue.java
 ├── test/java/                        # TestNG suites (group: "Regression")
 └── resources/
     ├── application.properties        # Neo4j connection, server port, logging
@@ -606,7 +612,7 @@ spring.data.neo4j.password=password
 server.port=8080
 
 # Logging Configuration
-logging.level.com.qanairy=DEBUG
+logging.level.com.deepthought=DEBUG
 logging.level.org.neo4j=WARN
 ```
 
@@ -853,7 +859,7 @@ Error: Port 8080 already in use
 ### Debug Mode
 
 ```properties
-logging.level.com.qanairy=DEBUG
+logging.level.com.deepthought=DEBUG
 logging.level.org.neo4j=DEBUG
 logging.level.org.springframework.data.neo4j=DEBUG
 ```

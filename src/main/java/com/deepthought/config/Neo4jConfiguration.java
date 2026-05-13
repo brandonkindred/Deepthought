@@ -1,4 +1,4 @@
-package com.qanairy.config;
+package com.deepthought.config;
 
 import org.neo4j.ogm.session.SessionFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

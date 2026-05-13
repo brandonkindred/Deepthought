@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 /**
  * DTO for a single labeled training example used by the token-based logistic regression

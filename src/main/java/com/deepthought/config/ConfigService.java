@@ -1,4 +1,4 @@
-package com.qanairy.config;
+package com.deepthought.config;
 
 import java.security.InvalidParameterException;
 import java.text.MessageFormat;

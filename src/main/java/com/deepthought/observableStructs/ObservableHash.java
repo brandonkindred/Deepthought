@@ -1,4 +1,4 @@
-package com.qanairy.observableStructs;
+package com.deepthought.observableStructs;
 
 import java.util.HashMap;
 import java.util.Observable;

@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 import java.util.HashMap;
 import java.util.List;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.qanairy.brain.LanguageModelService;
+import com.deepthought.brain.LanguageModelService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;

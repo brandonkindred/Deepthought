@@ -1,4 +1,4 @@
-package com.qanairy.deepthought;
+package com.deepthought;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -7,12 +7,8 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.PropertySources;
 
-/**
- * Hello world!
- *
- */
 @SpringBootApplication(exclude={Neo4jDataAutoConfiguration.class})
-@ComponentScan(basePackages = {"com.deepthought","com.qanairy"})
+@ComponentScan(basePackages = {"com.deepthought"})
 @PropertySources({
 	@PropertySource("classpath:application.properties")
 })

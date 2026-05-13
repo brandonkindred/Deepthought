@@ -1,4 +1,4 @@
-package com.qanairy.observableStructs;
+package com.deepthought.observableStructs;
 
 import static org.testng.Assert.*;
 

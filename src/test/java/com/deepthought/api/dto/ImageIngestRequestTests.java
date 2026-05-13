@@ -1,4 +1,4 @@
-package com.qanairy.api.dto;
+package com.deepthought.api.dto;
 
 import org.testng.annotations.Test;
 

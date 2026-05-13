@@ -1,4 +1,4 @@
-package com.qanairy.api.dto;
+package com.deepthought.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

@@ -1,4 +1,4 @@
-package com.qanairy.db;
+package com.deepthought.db;
 
 import java.util.ArrayList;
 import java.util.HashMap;

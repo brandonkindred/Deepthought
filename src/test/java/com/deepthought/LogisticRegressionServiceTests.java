@@ -1,4 +1,4 @@
-package Qanairy.deepthought;
+package com.deepthought;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -16,8 +16,8 @@ import org.testng.annotations.Test;
 
 import com.deepthought.models.LogisticRegressionModel;
 import com.deepthought.models.repository.LogisticRegressionModelRepository;
-import com.qanairy.api.TokenSample;
-import com.qanairy.brain.LogisticRegressionService;
+import com.deepthought.api.TokenSample;
+import com.deepthought.brain.LogisticRegressionService;
 
 @Test(groups = "Regression")
 public class LogisticRegressionServiceTests {

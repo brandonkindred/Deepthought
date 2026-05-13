@@ -1,4 +1,4 @@
-package Qanairy.deepthought;
+package com.deepthought;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import Qanairy.deepthought.resourceClasses.SelfContainedTestObject;
+import com.deepthought.resourceClasses.SelfContainedTestObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -17,7 +17,7 @@ import org.json.JSONObject;
 import org.testng.annotations.Test;
 
 import com.deepthought.models.Token;
-import com.qanairy.db.DataDecomposer;
+import com.deepthought.db.DataDecomposer;
 
 @Test(groups = "Regression")
 public class DataDecomposerTests {

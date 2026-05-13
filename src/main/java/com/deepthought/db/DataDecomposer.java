@@ -1,4 +1,4 @@
-package com.qanairy.db;
+package com.deepthought.db;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;

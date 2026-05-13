@@ -110,9 +110,9 @@ The dashed line to Neo4j highlights that, while the broader system is graph-back
 ```mermaid
 flowchart TD
     A[HTTP Client] -->|POST /rl/train| B[Spring DispatcherServlet]
-    B --> C["ReinforcementLearningController.train()<br/>package: com.qanairy.api<br/>(file: src/main/java/com/deepthought/api/...)"]
-    C --> D["DataDecomposer.decompose(JSONObject)<br/>package: com.qanairy.db<br/>(file: src/main/java/com/deepthought/db/...)"]
-    C --> E["Brain.train(List&lt;Token&gt;, String)<br/>package: com.qanairy.brain<br/>(file: src/main/java/com/deepthought/brain/...)"]
+    B --> C["ReinforcementLearningController.train()<br/>package: com.deepthought.api<br/>(file: src/main/java/com/deepthought/api/...)"]
+    C --> D["DataDecomposer.decompose(JSONObject)<br/>package: com.deepthought.db<br/>(file: src/main/java/com/deepthought/db/...)"]
+    C --> E["Brain.train(List&lt;Token&gt;, String)<br/>package: com.deepthought.brain<br/>(file: src/main/java/com/deepthought/brain/...)"]
     E --> F["Vocabulary<br/>package: com.deepthought.models"]
     F --> G["addWord / appendToVocabulary / getTokens"]
 
@@ -122,7 +122,7 @@ flowchart TD
     classDef ext fill:#eee,stroke:#999,stroke-dasharray: 4 4,color:#666;
 ```
 
-> **Heads-up: package vs. directory mismatch.** The first three classes physically live under `src/main/java/com/deepthought/...`, but their `package` declarations read `com.qanairy.api`, `com.qanairy.db`, and `com.qanairy.brain`. Their fully-qualified names are therefore `com.qanairy.*` (used in imports), while the on-disk paths use `com/deepthought/`. Spring's `@ComponentScan` covers both root packages (see `App.java`).
+All production code lives under the single root package `com.deepthought.*`.
 
 ---
 
@@ -449,7 +449,7 @@ If you do not see these lines, the request never reached `Brain.train()`.
 
 ### Spring wiring
 
-- Component scan covers `com.deepthought` and `com.qanairy` — declared on the `App` class via `@ComponentScan(basePackages = {"com.deepthought","com.qanairy"})`.
+- Component scan covers `com.deepthought` — declared on the `App` class via `@ComponentScan(basePackages = {"com.deepthought"})`.
 - `Brain` is a Spring-managed bean field-injected into `ReinforcementLearningController` with `@Autowired`.
 
 ### Neo4j
@@ -479,7 +479,7 @@ If you do not see these lines, the request never reached `Brain.train()`.
 
 ### Existing coverage
 
-- **Unit test:** `src/test/java/com/qanairy/api/ReinforcementLearningControllerTests.java:113-118`
+- **Unit test:** `src/test/java/com/deepthought/api/ReinforcementLearningControllerTests.java:113-118`
 
   ```java
   @Test
@@ -539,4 +539,4 @@ Both must pass for the documented behavior to hold.
 | `Token` entity | `src/main/java/com/deepthought/models/Token.java` | — |
 | `TokenWeight` edge (context) | `src/main/java/com/deepthought/models/edges/TokenWeight.java` | — |
 | Neo4j configuration (context) | `src/main/java/com/deepthought/config/Neo4jConfiguration.java` | — |
-| Existing unit test | `src/test/java/com/qanairy/api/ReinforcementLearningControllerTests.java` | 113-118 |
+| Existing unit test | `src/test/java/com/deepthought/api/ReinforcementLearningControllerTests.java` | 113-118 |

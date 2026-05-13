@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,8 +19,8 @@ import com.deepthought.models.ImageMatrixNode;
 import com.deepthought.models.edges.PartOf;
 import com.deepthought.models.repository.ImageMatrixNodeRepository;
 import com.deepthought.models.repository.PartOfRepository;
-import com.qanairy.api.dto.ImageIngestRequest;
-import com.qanairy.image.ImageProcessingService;
+import com.deepthought.api.dto.ImageIngestRequest;
+import com.deepthought.image.ImageProcessingService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

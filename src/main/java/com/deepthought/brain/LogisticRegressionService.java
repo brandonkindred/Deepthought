@@ -1,4 +1,4 @@
-package com.qanairy.brain;
+package com.deepthought.brain;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,8 +23,8 @@ import org.tribuo.provenance.SimpleDataSourceProvenance;
 import com.deepthought.models.LogisticRegressionModel;
 import com.deepthought.models.Token;
 import com.deepthought.models.repository.LogisticRegressionModelRepository;
-import com.qanairy.api.TokenSample;
-import com.qanairy.db.DataDecomposer;
+import com.deepthought.api.TokenSample;
+import com.deepthought.db.DataDecomposer;
 
 /**
  * Trains and evaluates binary logistic regression models. Wraps Tribuo's

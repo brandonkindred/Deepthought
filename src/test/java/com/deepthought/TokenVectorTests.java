@@ -1,4 +1,4 @@
-package Qanairy.deepthought;
+package com.deepthought;
 
 import static org.testng.Assert.assertEquals;
 
@@ -9,7 +9,7 @@ import java.util.List;
 import org.testng.annotations.Test;
 
 import com.deepthought.models.Token;
-import com.qanairy.brain.TokenVector;
+import com.deepthought.brain.TokenVector;
 
 @Test(groups = "Regression")
 public class TokenVectorTests {
