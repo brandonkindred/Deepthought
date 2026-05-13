@@ -6,6 +6,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -188,5 +189,30 @@ public class LanguageModelServiceTests {
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void generateRejectsNonPositiveMaxLength() {
 		service.generate("a", 0, null);
+	}
+
+	@Test(expectedExceptions = IllegalArgumentException.class)
+	public void generateRejectsMaxLengthAboveCap() {
+		service.generate("a", LanguageModelService.MAX_GENERATION_LENGTH + 1, null);
+	}
+
+	@Test
+	public void greedyGenerateBreaksOnGraphCycle() {
+		when(token_repo.getTokenWeights("a")).thenReturn(Collections.singleton(edge("a", "b", 1.0)));
+		when(token_repo.getTokenWeights("b")).thenReturn(Collections.singleton(edge("b", "a", 1.0)));
+
+		List<String> sequence = service.generate("a", LanguageModelService.MAX_GENERATION_LENGTH, null);
+		assertEquals(sequence, Arrays.asList("a", "b"));
+	}
+
+	@Test
+	public void distributionIterationOrderIsLexicographic() {
+		when(token_repo.getTokenWeights("a")).thenReturn(new LinkedHashSet<>(Arrays.asList(
+				edge("a", "zebra", 1.0),
+				edge("a", "alpha", 1.0),
+				edge("a", "mango", 1.0))));
+
+		List<String> keys = new ArrayList<>(service.nextTokenDistribution("a").keySet());
+		assertEquals(keys, Arrays.asList("alpha", "mango", "zebra"));
 	}
 }

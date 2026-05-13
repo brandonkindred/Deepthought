@@ -1,11 +1,12 @@
 package com.qanairy.brain;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,13 @@ import com.deepthought.models.repository.TokenRepository;
 public class LanguageModelService {
 	private static final Logger log = LoggerFactory.getLogger(LanguageModelService.class);
 
+	/**
+	 * Hard cap on the length of a single {@code /llm/generate} response. Caller-supplied
+	 *  {@code max_length} values above this are rejected so a runaway request cannot tie up
+	 *  the request thread or Neo4j with an unbounded walk.
+	 */
+	public static final int MAX_GENERATION_LENGTH = 1000;
+
 	private final TokenRepository token_repo;
 
 	public LanguageModelService(TokenRepository token_repo) {
@@ -34,8 +42,10 @@ public class LanguageModelService {
 	/**
 	 * Returns the normalized probability distribution over next tokens for {@code seed} by
 	 *  reading its outgoing edge weights from the graph. Negative weights are clamped to
-	 *  zero. Returns an empty map when the token has no outgoing edges or every weight is
-	 *  non-positive.
+	 *  zero. The returned map iterates in lexicographic order of target token so seeded
+	 *  sampling is reproducible across runs even though the repository returns a {@code Set}
+	 *  and the underlying Cypher has no {@code ORDER BY}. Returns an empty map when the
+	 *  token has no outgoing edges or every weight is non-positive.
 	 */
 	public Map<String, Double> nextTokenDistribution(String seed) {
 		if (seed == null) {
@@ -43,10 +53,10 @@ public class LanguageModelService {
 		}
 		Set<TokenWeight> weights = token_repo.getTokenWeights(seed);
 		if (weights == null || weights.isEmpty()) {
-			return new LinkedHashMap<>();
+			return new TreeMap<>();
 		}
 
-		Map<String, Double> totals = new LinkedHashMap<>();
+		Map<String, Double> totals = new TreeMap<>();
 		double sum = 0.0;
 		for (TokenWeight weight : weights) {
 			Token end = weight.getEndToken();
@@ -59,10 +69,10 @@ public class LanguageModelService {
 			sum += w;
 		}
 		if (sum <= 0.0) {
-			return new LinkedHashMap<>();
+			return new TreeMap<>();
 		}
 
-		Map<String, Double> distribution = new LinkedHashMap<>();
+		Map<String, Double> distribution = new TreeMap<>();
 		for (Map.Entry<String, Double> entry : totals.entrySet()) {
 			distribution.put(entry.getKey(), entry.getValue() / sum);
 		}
@@ -71,7 +81,7 @@ public class LanguageModelService {
 
 	/**
 	 * Returns the highest-probability next token after {@code seed}, or {@code null} if it
-	 *  has no outgoing transitions.
+	 *  has no outgoing transitions. Ties are broken by lexicographic order of target token.
 	 */
 	public String predictNext(String seed) {
 		Map<String, Double> distribution = nextTokenDistribution(seed);
@@ -117,8 +127,14 @@ public class LanguageModelService {
 	/**
 	 * Generates a sequence of at most {@code max_length} tokens starting from {@code seed}.
 	 *  When {@code random} is {@code null} the next token is chosen greedily; otherwise it
-	 *  is sampled. Generation stops early when a token has no outgoing transitions or it
-	 *  repeats the immediately previous token.
+	 *  is sampled. Generation stops early when a token has no outgoing transitions, or, in
+	 *  greedy mode, when the next token has already appeared in the sequence — greedy
+	 *  generation is fully determined by the current token, so any revisit would produce an
+	 *  infinite cycle.
+	 *
+	 * @throws IllegalArgumentException if {@code max_length} exceeds
+	 *         {@link #MAX_GENERATION_LENGTH}; that bound prevents a single request from
+	 *         tying up the thread and Neo4j when the graph contains long cycles.
 	 */
 	public List<String> generate(String seed, int max_length, Random random) {
 		if (seed == null || seed.isEmpty()) {
@@ -127,16 +143,25 @@ public class LanguageModelService {
 		if (max_length < 1) {
 			throw new IllegalArgumentException("max_length must be at least 1");
 		}
+		if (max_length > MAX_GENERATION_LENGTH) {
+			throw new IllegalArgumentException("max_length must not exceed " + MAX_GENERATION_LENGTH);
+		}
 
 		List<String> sequence = new ArrayList<>();
 		sequence.add(seed);
+		Set<String> visited = new HashSet<>();
+		visited.add(seed);
 		String current = seed;
 		for (int i = 1; i < max_length; i++) {
 			String next = random == null ? predictNext(current) : sampleNext(current, random);
-			if (next == null || next.equals(current)) {
+			if (next == null) {
+				break;
+			}
+			if (random == null && visited.contains(next)) {
 				break;
 			}
 			sequence.add(next);
+			visited.add(next);
 			current = next;
 		}
 		log.debug("generated {} tokens from seed '{}'", sequence.size(), seed);
