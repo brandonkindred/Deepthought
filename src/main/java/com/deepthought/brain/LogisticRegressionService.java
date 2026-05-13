@@ -2,10 +2,23 @@ package com.qanairy.brain;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
+import org.tribuo.Model;
+import org.tribuo.MutableDataset;
+import org.tribuo.Prediction;
+import org.tribuo.Trainer;
+import org.tribuo.classification.Label;
+import org.tribuo.classification.LabelFactory;
+import org.tribuo.classification.sgd.linear.LinearSGDTrainer;
+import org.tribuo.classification.sgd.objectives.LogMulticlass;
+import org.tribuo.datasource.ListDataSource;
+import org.tribuo.impl.ArrayExample;
+import org.tribuo.math.optimisers.SGD;
+import org.tribuo.provenance.SimpleDataSourceProvenance;
 
 import com.deepthought.models.LogisticRegressionModel;
 import com.deepthought.models.Token;
@@ -13,19 +26,23 @@ import com.deepthought.models.repository.LogisticRegressionModelRepository;
 import com.qanairy.api.TokenSample;
 import com.qanairy.db.DataDecomposer;
 
-import smile.classification.LogisticRegression;
-
 /**
- * Trains and evaluates binary logistic regression models. Wraps Smile's
- *  {@link LogisticRegression#binomial(double[][], int[])} fitter and persists the
- *  resulting coefficients to a {@link LogisticRegressionModel} node so a model can be
- *  referenced by id from a follow-up predict call.
+ * Trains and evaluates binary logistic regression models. Wraps Tribuo's
+ *  {@link LinearSGDTrainer} configured with a {@link LogMulticlass} objective (multinomial
+ *  logistic regression) and persists the fitted {@link Model} on a
+ *  {@link LogisticRegressionModel} node so a model can be referenced by id from a
+ *  follow-up predict call.
  *
- * Predictions are computed directly from the persisted intercept + weights via a sigmoid
- *  so we do not need to round-trip a Smile object through Neo4j.
+ * Predictions are computed by rehydrating the stored Tribuo model and calling
+ *  {@link Model#predict(org.tribuo.Example)} so the model owns its own scoring math.
  */
 @Component
 public class LogisticRegressionService {
+
+	private static final int DEFAULT_EPOCHS = 20;
+	private static final double DEFAULT_LEARNING_RATE = 1.0;
+	private static final String CLASS_ZERO = "0";
+	private static final String CLASS_ONE = "1";
 
 	private final LogisticRegressionModelRepository repo;
 
@@ -34,7 +51,8 @@ public class LogisticRegressionService {
 	}
 
 	public LogisticRegressionModel train(double[][] features, int[] labels) {
-		return repo.save(fit(features, labels));
+		validateTrainingInputs(features, labels);
+		return repo.save(fit(features, labels, numericFeatureNames(features[0].length)));
 	}
 
 	public LogisticRegressionModel trainFromTokens(List<TokenSample> samples, String[] output_labels) {
@@ -53,18 +71,7 @@ public class LogisticRegressionService {
 			TokenSample sample = samples.get(i);
 			labels[i] = sample.getLabel();
 
-			List<Token> tokens;
-			try {
-				tokens = DataDecomposer.decompose(new JSONObject(sample.getInput()));
-			} catch (JSONException e) {
-				try {
-					tokens = DataDecomposer.decompose(sample.getInput());
-				} catch (IllegalAccessException ex) {
-					throw new IllegalArgumentException("failed to decompose sample input at index " + i, ex);
-				}
-			} catch (IllegalAccessException e) {
-				throw new IllegalArgumentException("failed to decompose sample input at index " + i, e);
-			}
+			List<Token> tokens = decompose(sample.getInput(), "sample input at index " + i);
 
 			List<String> token_values = new ArrayList<>(tokens.size());
 			for (Token token : tokens) {
@@ -88,7 +95,9 @@ public class LogisticRegressionService {
 			}
 		}
 
-		LogisticRegressionModel model = fit(features, labels);
+		validateTrainingInputs(features, labels);
+		String[] feature_names = vocabulary.toArray(new String[0]);
+		LogisticRegressionModel model = fit(features, labels, feature_names);
 		model.setVocabulary(vocabulary);
 		return repo.save(model);
 	}
@@ -105,12 +114,12 @@ public class LogisticRegressionService {
 					+ " does not match trained model (" + model.getNumFeatures() + ")");
 		}
 
-		double[] weights = model.getWeights();
-		double z = model.getIntercept();
-		for (int i = 0; i < features.length; i++) {
-			z += weights[i] * features[i];
+		Model<Label> tribuo = model.getTribuoModel();
+		if (tribuo == null) {
+			throw new IllegalArgumentException("model has no persisted Tribuo state");
 		}
-		return sigmoid(z);
+		String[] names = featureNamesFor(model);
+		return scoreClassOne(tribuo, names, features);
 	}
 
 	public double predictProbabilityFromInput(LogisticRegressionModel model, String input) {
@@ -122,19 +131,7 @@ public class LogisticRegressionService {
 			throw new IllegalArgumentException("model was not trained from tokens; use the numeric predict endpoint");
 		}
 
-		List<Token> tokens;
-		try {
-			tokens = DataDecomposer.decompose(new JSONObject(input));
-		} catch (JSONException e) {
-			try {
-				tokens = DataDecomposer.decompose(input);
-			} catch (IllegalAccessException ex) {
-				throw new IllegalArgumentException("failed to decompose input", ex);
-			}
-		} catch (IllegalAccessException e) {
-			throw new IllegalArgumentException("failed to decompose input", e);
-		}
-
+		List<Token> tokens = decompose(input, "input");
 		double[] features = new double[vocabulary.size()];
 		for (Token token : tokens) {
 			String value = token.getValue();
@@ -153,21 +150,67 @@ public class LogisticRegressionService {
 		return probability >= 0.5 ? 1 : 0;
 	}
 
-	private LogisticRegressionModel fit(double[][] features, int[] labels) {
-		validateTrainingInputs(features, labels);
+	private LogisticRegressionModel fit(double[][] features, int[] labels, String[] feature_names) {
+		LabelFactory factory = new LabelFactory();
+		List<org.tribuo.Example<Label>> examples = new ArrayList<>(features.length);
+		for (int i = 0; i < features.length; i++) {
+			Label label = new Label(labels[i] == 1 ? CLASS_ONE : CLASS_ZERO);
+			examples.add(new ArrayExample<>(label, feature_names, features[i]));
+		}
 
-		LogisticRegression.Binomial binomial = LogisticRegression.binomial(features, labels);
-		double[] coefficients = binomial.coefficients();
+		ListDataSource<Label> source = new ListDataSource<>(examples, factory,
+				new SimpleDataSourceProvenance("inline", factory));
+		MutableDataset<Label> dataset = new MutableDataset<>(source);
 
-		double[] weights = new double[coefficients.length - 1];
-		System.arraycopy(coefficients, 0, weights, 0, weights.length);
-		double intercept = coefficients[coefficients.length - 1];
+		LinearSGDTrainer trainer = new LinearSGDTrainer(
+				new LogMulticlass(),
+				SGD.getLinearDecaySGD(DEFAULT_LEARNING_RATE),
+				DEFAULT_EPOCHS,
+				Trainer.DEFAULT_SEED);
+		Model<Label> tribuoModel = trainer.train(dataset);
 
 		LogisticRegressionModel model = new LogisticRegressionModel();
-		model.setIntercept(intercept);
-		model.setWeights(weights);
+		model.setTribuoModel(tribuoModel);
 		model.setNumFeatures(features[0].length);
 		return model;
+	}
+
+	private double scoreClassOne(Model<Label> tribuo, String[] feature_names, double[] features) {
+		ArrayExample<Label> example = new ArrayExample<>(new Label(CLASS_ZERO), feature_names, features);
+		Prediction<Label> pred = tribuo.predict(example);
+		Map<String, Label> scores = pred.getOutputScores();
+		Label class_one = scores.get(CLASS_ONE);
+		return class_one == null ? 0.0 : class_one.getScore();
+	}
+
+	private List<Token> decompose(String input, String context) {
+		try {
+			return DataDecomposer.decompose(new JSONObject(input));
+		} catch (JSONException e) {
+			try {
+				return DataDecomposer.decompose(input);
+			} catch (IllegalAccessException ex) {
+				throw new IllegalArgumentException("failed to decompose " + context, ex);
+			}
+		} catch (IllegalAccessException e) {
+			throw new IllegalArgumentException("failed to decompose " + context, e);
+		}
+	}
+
+	private String[] featureNamesFor(LogisticRegressionModel model) {
+		List<String> vocabulary = model.getVocabulary();
+		if (vocabulary != null && !vocabulary.isEmpty()) {
+			return vocabulary.toArray(new String[0]);
+		}
+		return numericFeatureNames(model.getNumFeatures());
+	}
+
+	private String[] numericFeatureNames(int n) {
+		String[] names = new String[n];
+		for (int i = 0; i < n; i++) {
+			names[i] = "f" + i;
+		}
+		return names;
 	}
 
 	private void validateTrainingInputs(double[][] features, int[] labels) {
@@ -214,9 +257,5 @@ public class LogisticRegressionService {
 						+ " but expected " + num_features);
 			}
 		}
-	}
-
-	private static double sigmoid(double z) {
-		return 1.0 / (1.0 + Math.exp(-z));
 	}
 }

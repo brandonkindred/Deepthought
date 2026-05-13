@@ -45,7 +45,7 @@ public class LogisticRegressionServiceTests {
 
 		assertNotNull(model);
 		assertEquals(model.getNumFeatures(), 2);
-		assertEquals(model.getWeights().length, 2);
+		assertNotNull(model.getTribuoModel());
 
 		double prob_class_one = service.predictProbability(model, new double[] { 2.5, 2.5 });
 		double prob_class_zero = service.predictProbability(model, new double[] { 0.0, 0.0 });
