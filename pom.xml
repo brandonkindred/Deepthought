@@ -180,5 +180,12 @@
 	    <version>4.5.5-0</version>
 	</dependency>
 
+	<!-- Smile ML library for logistic regression (last Java 8-compatible release) -->
+	<dependency>
+	    <groupId>com.github.haifengl</groupId>
+	    <artifactId>smile-core</artifactId>
+	    <version>2.6.0</version>
+	</dependency>
+
   </dependencies>
 </project>
