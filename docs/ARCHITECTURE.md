@@ -189,7 +189,7 @@ package declaration. This is benign at runtime because
 | `DataDecomposer`, `VocabularyWeights` | `com.qanairy.db` | `src/main/java/com/deepthought/db/*.java` |
 | `ImageProcessingService` | `com.qanairy.image` | `src/main/java/com/qanairy/image/ImageProcessingService.java` |
 | `Token`, `Vocabulary`, `MemoryRecord`, `ImageMatrixNode`, `LogisticRegressionModel`, edges, repositories | `com.deepthought.models.*` | `src/main/java/com/deepthought/models/...` |
-| `Neo4jConfiguration`, `ConfigService` | `com.deepthought.config` | `src/main/java/com/deepthought/config/*.java` |
+| `Neo4jConfiguration`, `ConfigService` | `com.qanairy.config` | `src/main/java/com/deepthought/config/*.java` |
 | `ObservableHash`, `ObservableQueue`, `ConcurrentNode` | `com.qanairy.observableStructs` | `src/main/java/com/deepthought/observableStructs/*.java` |
 
 When searching code use the package declaration; when navigating the
@@ -213,9 +213,17 @@ working tree use the filesystem path.
 | LR  | `POST` | `/lr/predict-from-tokens` | Decompose, one-hot against model's stored vocabulary, score | read |
 | Image | `POST` | `/images/ingest` | Decode base64 image; create `ORIGINAL` + `OUTLINE` + `PCA` + `BLACK_WHITE` + `CROPPED_OBJECT` matrix nodes linked via `PART_OF` | write |
 
-The OpenAPI 3 spec at [`openapi.yaml`](../openapi.yaml) is the contract
-source; Swagger UI is exposed at `/swagger-ui.html` when the app is
-running.
+Swagger UI is exposed at `/swagger-ui.html` when the app is running and
+is generated live from the controllers, so it always reflects the
+current `/rl/*`, `/llm/*`, `/lr/*`, and `/images/*` endpoint set.
+
+The static [`openapi.yaml`](../openapi.yaml) checked into the repo only
+documents `/rl/predict`, `/rl/learn`, `/rl/train`, and `/images/ingest`
+— `/llm/*` and `/lr/*` are not in it — and the RL parameter names in
+that file are stale (`output_features`/`feature_value` instead of the
+controllers' actual `output_tokens`/`token_value`). Treat Swagger UI
+as the source of truth for the request schema until that file is
+regenerated.
 
 ### 5.1 What is *not* exposed
 

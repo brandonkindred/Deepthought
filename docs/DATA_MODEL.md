@@ -34,6 +34,7 @@ erDiagram
         Long id
         String label
         StringList valueList
+        int size
     }
     MemoryRecord {
         Long id
@@ -97,8 +98,16 @@ The atomic unit of knowledge.
 - **Outgoing relationship fields** (OGM-mapped, not properties on the node):
   - `@Relationship(type = "HAS_RELATED_TOKEN") List<TokenWeight> token_weights`
 
-- **Equality:** Java `equals` / `hashCode` are based on `value` only.
-  There is **no Neo4j uniqueness constraint** on `Token.value`, so the
+- **Equality:** `Token.equals` is overridden to compare by `value`,
+  but `Token.hashCode` is **not** overridden — it inherits the default
+  identity-based hash from `java.lang.Object`. This breaks the
+  `equals`/`hashCode` contract for hashed collections: two `Token`
+  instances with the same `value` will compare equal but hash to
+  different buckets, so they do not deduplicate in `HashSet` /
+  `HashMap`. Code that needs set semantics on `value` should hash on
+  `getValue()` explicitly.
+
+- There is **no Neo4j uniqueness constraint** on `Token.value`, so the
   application logic must call `findByValue` before creating a new
   `Token`. If two requests race the cold-start path you can end up
   with duplicate `Token` nodes that share a value.
@@ -120,6 +129,7 @@ The atomic unit of knowledge.
   | `id` | `Long` | `@Id @GeneratedValue` |
   | `label` | `String` | `@NotBlank @Property` |
   | `valueList` | `List<String>` | `@Property` (stored as a Neo4j list of strings) |
+  | `size` | `int` | `@Property` — kept in sync with `valueList.size()` by `addWord`, `clear`, and `initializeMappings`; used by `VocabularyRepository.findBySize*` derived queries |
 
 - **Transient (not persisted):** `wordToIndexMap`, `nextIndex` are
   in-memory caches for index lookups and word counting.
@@ -492,9 +502,14 @@ predict.
 ## 8. Data Lifecycle & Retention
 
 The application **never deletes** anything from Neo4j. Every
-prediction adds a `MemoryRecord` + `PREDICTION` edges; every ingest
-adds an `ImageMatrixNode` cluster; every learn-cold-start adds a
-`Token` and a `HAS_RELATED_TOKEN`. Disk usage grows monotonically.
+prediction adds a `MemoryRecord` + `PREDICTION` edges (and on
+cold-start adds new `Token` nodes and `HAS_RELATED_TOKEN` edges via
+`Brain.generatePolicy`); every ingest adds an `ImageMatrixNode`
+cluster. `/rl/learn` only adds an edge when one is missing — its
+Cypher (`TokenRepository.createWeightedConnection`) is a `MATCH ...
+CREATE rel`, so it requires both endpoint tokens to already exist
+and never creates `Token` nodes itself. Disk usage grows
+monotonically.
 
 For long-running deployments a retention strategy is needed:
 
@@ -521,7 +536,7 @@ code but **not populated** by any current code path:
 |---|---|---|
 | `(:Vocabulary)` node label | `Brain.train` constructs one in memory but never saves it | Would need `vocabulary_repo.save(...)` in `Brain.train` and persistence of token references |
 | `MemoryRecord.desired_token` / `DESIRED_TOKEN` edge | `Brain.learn` mutates the in-memory entity but never re-saves the `MemoryRecord` | Add `memory_repo.save(memory)` after the inner loop in `Brain.learn` |
-| `TokenPolicy` relationship type | No code creates it | Reserved for storing per-prediction policy reward audit |
+| `TOKEN_POLICY` relationship type (mapped by the `TokenPolicy` Java class) | No code creates it | Reserved for storing per-prediction policy reward audit |
 
 When extending the system, these are the natural places to start —
 they already have OGM mappings, repositories where applicable, and a
