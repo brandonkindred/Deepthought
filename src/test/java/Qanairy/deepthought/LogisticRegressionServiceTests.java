@@ -100,6 +100,13 @@ public class LogisticRegressionServiceTests {
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
+	public void rejectsNullFeatureRow() {
+		double[][] features = new double[][] { null, { 1.0 } };
+		int[] labels = new int[] { 0, 1 };
+		service.train(features, labels);
+	}
+
+	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void predictRejectsMismatchedFeatureLength() {
 		double[][] features = new double[][] { { 0.0, 0.0 }, { 5.0, 5.0 } };
 		int[] labels = new int[] { 0, 1 };

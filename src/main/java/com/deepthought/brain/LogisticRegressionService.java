@@ -199,12 +199,17 @@ public class LogisticRegressionService {
 			throw new IllegalArgumentException("training set must contain at least one sample of each class");
 		}
 
-		int num_features = features[0].length;
-		if (num_features == 0) {
-			throw new IllegalArgumentException("feature rows must be non-empty");
-		}
+		int num_features = -1;
 		for (int i = 0; i < features.length; i++) {
-			if (features[i].length != num_features) {
+			if (features[i] == null) {
+				throw new IllegalArgumentException("feature row " + i + " cannot be null");
+			}
+			if (num_features < 0) {
+				num_features = features[i].length;
+				if (num_features == 0) {
+					throw new IllegalArgumentException("feature rows must be non-empty");
+				}
+			} else if (features[i].length != num_features) {
 				throw new IllegalArgumentException("feature row " + i + " has length " + features[i].length
 						+ " but expected " + num_features);
 			}
