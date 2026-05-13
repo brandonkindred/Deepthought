@@ -5,116 +5,82 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.deepthought.models.GraphLanguageModel;
 import com.deepthought.models.Token;
 import com.deepthought.models.edges.TokenWeight;
-import com.deepthought.models.repository.GraphLanguageModelRepository;
-import com.deepthought.models.repository.TokenWeightRepository;
+import com.deepthought.models.repository.TokenRepository;
 
 /**
- * Materializes a bigram language model from the current state of the Neo4j knowledge graph.
- *  Every {@code HAS_RELATED_TOKEN} edge is treated as one observation of a (source, target)
- *  transition weighted by its learned Q-value, and each source row is normalized into a
- *  probability distribution over next tokens. The resulting transition table is persisted
- *  as a {@link GraphLanguageModel} node so subsequent generate calls reference it by id
- *  rather than re-walking the graph.
+ * Treats the current Neo4j graph as a bigram language model: for any source token, its
+ *  outgoing {@code HAS_RELATED_TOKEN} edge weights define an unnormalized distribution over
+ *  next tokens. Nothing is persisted — every call reads the live edge weights, so updates
+ *  from {@link Brain#learn} are reflected immediately.
  */
 @Component
 public class LanguageModelService {
 	private static final Logger log = LoggerFactory.getLogger(LanguageModelService.class);
 
-	private final TokenWeightRepository token_weight_repo;
-	private final GraphLanguageModelRepository model_repo;
+	private final TokenRepository token_repo;
 
-	public LanguageModelService(TokenWeightRepository token_weight_repo,
-								GraphLanguageModelRepository model_repo) {
-		this.token_weight_repo = token_weight_repo;
-		this.model_repo = model_repo;
+	public LanguageModelService(TokenRepository token_repo) {
+		this.token_repo = token_repo;
 	}
 
 	/**
-	 * Snapshots the current graph into a {@link GraphLanguageModel}. Each source token's
-	 *  outgoing edges become a normalized probability distribution; negative weights are
-	 *  clamped to zero so a single accidentally negative weight cannot invert the
-	 *  distribution. Source tokens whose outgoing weights sum to zero are skipped.
+	 * Returns the normalized probability distribution over next tokens for {@code seed} by
+	 *  reading its outgoing edge weights from the graph. Negative weights are clamped to
+	 *  zero. Returns an empty map when the token has no outgoing edges or every weight is
+	 *  non-positive.
 	 */
-	public GraphLanguageModel generateModel() {
-		List<TokenWeight> edges = token_weight_repo.findAllWithEndpoints();
-		log.info("generating language model from {} graph edges", edges == null ? 0 : edges.size());
-
-		Map<String, Map<String, Double>> raw = new LinkedHashMap<>();
-		if (edges != null) {
-			for (TokenWeight edge : edges) {
-				Token source = edge.getToken();
-				Token target = edge.getEndToken();
-				if (source == null || target == null) {
-					continue;
-				}
-				String src_value = source.getValue();
-				String tgt_value = target.getValue();
-				if (src_value == null || tgt_value == null) {
-					continue;
-				}
-				double weight = Math.max(edge.getWeight(), 0.0);
-				Map<String, Double> row = raw.get(src_value);
-				if (row == null) {
-					row = new LinkedHashMap<>();
-					raw.put(src_value, row);
-				}
-				Double current = row.get(tgt_value);
-				row.put(tgt_value, (current == null ? 0.0 : current) + weight);
-			}
-		}
-
-		Map<String, Map<String, Double>> normalized = new LinkedHashMap<>();
-		int transition_count = 0;
-		for (Map.Entry<String, Map<String, Double>> entry : raw.entrySet()) {
-			Map<String, Double> row = entry.getValue();
-			double sum = 0.0;
-			for (Double w : row.values()) {
-				sum += w;
-			}
-			if (sum <= 0.0) {
-				continue;
-			}
-			Map<String, Double> normalized_row = new LinkedHashMap<>();
-			for (Map.Entry<String, Double> t : row.entrySet()) {
-				normalized_row.put(t.getKey(), t.getValue() / sum);
-			}
-			normalized.put(entry.getKey(), normalized_row);
-			transition_count += normalized_row.size();
-		}
-
-		GraphLanguageModel model = new GraphLanguageModel();
-		model.setTransitions(normalized);
-		model.setVocabularySize(normalized.size());
-		model.setTransitionCount(transition_count);
-		return model_repo.save(model);
-	}
-
-	/**
-	 * Returns the most probable next token after {@code seed}, or {@code null} if the seed
-	 *  has no outgoing transitions in this model. Ties are broken by insertion order.
-	 */
-	public String predictNext(GraphLanguageModel model, String seed) {
-		if (model == null) {
-			throw new IllegalArgumentException("model cannot be null");
-		}
+	public Map<String, Double> nextTokenDistribution(String seed) {
 		if (seed == null) {
 			throw new IllegalArgumentException("seed cannot be null");
 		}
-		Map<String, Double> row = model.getTransitions().get(seed);
-		if (row == null || row.isEmpty()) {
+		Set<TokenWeight> weights = token_repo.getTokenWeights(seed);
+		if (weights == null || weights.isEmpty()) {
+			return new LinkedHashMap<>();
+		}
+
+		Map<String, Double> totals = new LinkedHashMap<>();
+		double sum = 0.0;
+		for (TokenWeight weight : weights) {
+			Token end = weight.getEndToken();
+			if (end == null || end.getValue() == null) {
+				continue;
+			}
+			double w = Math.max(weight.getWeight(), 0.0);
+			Double existing = totals.get(end.getValue());
+			totals.put(end.getValue(), (existing == null ? 0.0 : existing) + w);
+			sum += w;
+		}
+		if (sum <= 0.0) {
+			return new LinkedHashMap<>();
+		}
+
+		Map<String, Double> distribution = new LinkedHashMap<>();
+		for (Map.Entry<String, Double> entry : totals.entrySet()) {
+			distribution.put(entry.getKey(), entry.getValue() / sum);
+		}
+		return distribution;
+	}
+
+	/**
+	 * Returns the highest-probability next token after {@code seed}, or {@code null} if it
+	 *  has no outgoing transitions.
+	 */
+	public String predictNext(String seed) {
+		Map<String, Double> distribution = nextTokenDistribution(seed);
+		if (distribution.isEmpty()) {
 			return null;
 		}
 		String best = null;
 		double best_prob = Double.NEGATIVE_INFINITY;
-		for (Map.Entry<String, Double> entry : row.entrySet()) {
+		for (Map.Entry<String, Double> entry : distribution.entrySet()) {
 			if (entry.getValue() > best_prob) {
 				best_prob = entry.getValue();
 				best = entry.getKey();
@@ -124,28 +90,21 @@ public class LanguageModelService {
 	}
 
 	/**
-	 * Samples a next token after {@code seed} from its conditional distribution, using
-	 *  {@code random} as the source of randomness. Returns {@code null} if the seed has no
-	 *  outgoing transitions.
+	 * Samples a next token from the conditional distribution of {@code seed} using
+	 *  {@code random}. Returns {@code null} when the seed has no outgoing transitions.
 	 */
-	public String sampleNext(GraphLanguageModel model, String seed, Random random) {
-		if (model == null) {
-			throw new IllegalArgumentException("model cannot be null");
-		}
-		if (seed == null) {
-			throw new IllegalArgumentException("seed cannot be null");
-		}
+	public String sampleNext(String seed, Random random) {
 		if (random == null) {
 			throw new IllegalArgumentException("random cannot be null");
 		}
-		Map<String, Double> row = model.getTransitions().get(seed);
-		if (row == null || row.isEmpty()) {
+		Map<String, Double> distribution = nextTokenDistribution(seed);
+		if (distribution.isEmpty()) {
 			return null;
 		}
 		double r = random.nextDouble();
 		double cumulative = 0.0;
 		String last = null;
-		for (Map.Entry<String, Double> entry : row.entrySet()) {
+		for (Map.Entry<String, Double> entry : distribution.entrySet()) {
 			cumulative += entry.getValue();
 			last = entry.getKey();
 			if (r <= cumulative) {
@@ -156,15 +115,12 @@ public class LanguageModelService {
 	}
 
 	/**
-	 * Generates a token sequence of at most {@code max_length} tokens by repeatedly choosing
-	 *  the next token after the most recent one. When {@code random} is {@code null} the
-	 *  next token is chosen greedily; otherwise it is sampled. Generation stops early if a
-	 *  token has no outgoing transitions or repeats the immediately previous token.
+	 * Generates a sequence of at most {@code max_length} tokens starting from {@code seed}.
+	 *  When {@code random} is {@code null} the next token is chosen greedily; otherwise it
+	 *  is sampled. Generation stops early when a token has no outgoing transitions or it
+	 *  repeats the immediately previous token.
 	 */
-	public List<String> generate(GraphLanguageModel model, String seed, int max_length, Random random) {
-		if (model == null) {
-			throw new IllegalArgumentException("model cannot be null");
-		}
+	public List<String> generate(String seed, int max_length, Random random) {
 		if (seed == null || seed.isEmpty()) {
 			throw new IllegalArgumentException("seed cannot be null or empty");
 		}
@@ -176,13 +132,14 @@ public class LanguageModelService {
 		sequence.add(seed);
 		String current = seed;
 		for (int i = 1; i < max_length; i++) {
-			String next = random == null ? predictNext(model, current) : sampleNext(model, current, random);
+			String next = random == null ? predictNext(current) : sampleNext(current, random);
 			if (next == null || next.equals(current)) {
 				break;
 			}
 			sequence.add(next);
 			current = next;
 		}
+		log.debug("generated {} tokens from seed '{}'", sequence.size(), seed);
 		return sequence;
 	}
 }
