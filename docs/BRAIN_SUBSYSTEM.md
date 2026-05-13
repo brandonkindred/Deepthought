@@ -442,7 +442,7 @@ node property.
 | `ORIGINAL` | Just the downscaled RGB matrix from `decodeToRgbMatrix`. |
 | `OUTLINE` | RGB → grayscale (`COLOR_BGR2GRAY`) → 3×3 Gaussian blur → `Imgproc.Canny(blurred, edges, 50, 150)` → back to RGB. |
 | `PCA` | Each pixel as 3D vector → centered → covariance → `EigenDecomposition` → project onto top components → reconstruct. |
-| `BLACK_WHITE` | Per-pixel grayscale `0.299·R + 0.587·G + 0.114·B`, then threshold at 127 to produce a binary image. |
+| `BLACK_WHITE` | Per-pixel grayscale `gray = 0.299·R + 0.587·G + 0.114·B`, clamped to `[0, 255]`. The same `gray` value is written to all three RGB channels — the result is a grayscale image (R=G=B), **not** a binary mask. No threshold is applied. |
 | `CROPPED_OBJECT` | RGB → grayscale → `findContours(..., RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)` → bounding rectangle per contour → filter tiny boxes → crop. |
 
 All OpenCV `Mat` objects are explicitly `.release()`'d at the end of

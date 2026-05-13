@@ -127,8 +127,9 @@ flowchart TB
     end
 
     subgraph cfg["Configuration"]
+        N4P["Neo4jProperties<br/>(Spring Boot binding<br/>of spring.data.neo4j.*)"]
         N4C["Neo4jConfiguration<br/>SessionFactory,<br/>Neo4jTransactionManager"]
-        CS["ConfigService<br/>env-var loader"]
+        CS["ConfigService<br/>(dormant helper,<br/>not wired in)"]
     end
 
     Neo[("Neo4j 4.4<br/>via Bolt")]
@@ -167,7 +168,7 @@ flowchart TB
     LRR -.-> Neo
 
     N4C -. SessionFactory bean .-> TR
-    CS -. env vars .-> N4C
+    N4P -. createConfiguration() .-> N4C
 ```
 
 ### 4.1 Package vs. directory note
@@ -381,7 +382,7 @@ flowchart LR
     Decode --> Orig["save ORIGINAL"]
     Orig --> Out1["computeOutline<br/>Canny 50/150"]
     Orig --> Out2["computePca<br/>EigenDecomposition"]
-    Orig --> Out3["computeBlackAndWhite<br/>0.299R+0.587G+0.114B, T=127"]
+    Orig --> Out3["computeBlackAndWhite<br/>gray = 0.299R+0.587G+0.114B,<br/>write R=G=B=gray (no threshold)"]
     Orig --> Out4["detectAndCropObjects<br/>findContours RETR_EXTERNAL"]
     Out1 --> Edge1["save OUTLINE + PART_OF→ORIGINAL"]
     Out2 --> Edge2["save PCA + PART_OF→ORIGINAL"]
@@ -453,12 +454,19 @@ Sources: [`docker-compose.yml`](../docker-compose.yml),
 
 `application.properties` is templated; the active settings come from
 environment variables in the docker-compose deployment and are resolved
-either by Spring Boot's relaxed binding (`SPRING_DATA_NEO4J_URI` →
-`spring.data.neo4j.uri`) or by `ConfigService.getEnvVar(...)` for
-Neo4j credentials in `Neo4jConfiguration`. Running outside Docker
-requires either uncommenting and editing
+by Spring Boot's relaxed binding into the `Neo4jProperties` bean
+(`SPRING_DATA_NEO4J_URI` → `spring.data.neo4j.uri`, and likewise for
+`SPRING_DATA_NEO4J_USERNAME` / `SPRING_DATA_NEO4J_PASSWORD`).
+`Neo4jConfiguration` injects that `Neo4jProperties` bean and calls
+`properties.createConfiguration()` to build the OGM
+`org.neo4j.ogm.config.Configuration`. Running outside Docker requires
+either uncommenting and editing
 `src/main/resources/application.properties` or exporting the same
 environment variables before `mvn spring-boot:run`.
+
+`ConfigService` is a leftover helper (`getProperty(key)` wrapping
+`System.getenv`) that is **not used by `Neo4jConfiguration`** and is
+not referenced from any other production class. Treat it as dormant.
 
 ### 8.3 Direct-Maven topology (local development)
 
