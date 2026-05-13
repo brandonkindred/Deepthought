@@ -48,16 +48,14 @@ public class DataDecomposer {
 		        	List<Token> definition_list = decompose(obj);
 		        	objDefList.addAll(definition_list);
 	        	}
-	        	else if(value.getClass().equals(ArrayList.class)){
+	        	else if(value instanceof List){
 		        	log.info("Deconstructing Array list");
-		        	ArrayList<?> list = ((ArrayList<?>)value);
 		        	//return all elements of array
-		        	List<Token> decomposedList = decomposeArrayList(list);
+		        	List<Token> decomposedList = decomposeArrayList((List<?>)value);
 	        		objDefList.addAll(decomposedList);
 		        }
 	        	else if(value.getClass().equals(JSONObject.class)){
-	        		JSONObject json = new JSONObject(value.toString());
-	        		System.out.println("JSON :: "+json);
+	        		objDefList.addAll(decompose((JSONObject)value));
 	        	}
 		        else if(value.getClass().equals(String[].class)){
 		        	log.info("Deconstructing String array");
@@ -68,7 +66,7 @@ public class DataDecomposer {
 		        		objDefList.add(objDef);
 		            }
 		        }
-		        else if(value.getClass().equals(Object[].class)){
+		        else if(value instanceof Object[]){
 		        	log.info("Deconstructing Object list");
 
 		        	Object[] array = (Object[]) value;
@@ -77,9 +75,15 @@ public class DataDecomposer {
 		        }
 		        else if(value.getClass().equals(JSONArray.class)){
 		        	log.info("Deconstructing JSONArray list");
-		        	JSONArray array = new JSONArray(value.toString());
+		        	JSONArray array = (JSONArray) value;
 		        	for(int idx=0; idx<array.length(); idx++){
-		        		objDefList.addAll(decompose(array.get(idx).toString()));
+		        		Object item = array.get(idx);
+		        		if(item instanceof JSONObject){
+		        			objDefList.addAll(decompose((JSONObject) item));
+		        		}
+		        		else if(item != null){
+		        			objDefList.addAll(decompose(item.toString()));
+		        		}
 		        	}
 		        }
 		        else{
@@ -127,13 +131,13 @@ public class DataDecomposer {
 	 * @throws IllegalAccessException
 	 */
 	public static List<Token> decompose(Object obj) throws IllegalArgumentException, IllegalAccessException, NullPointerException{
-		List<Token> objDefList = new ArrayList<Token>();
-		JSONObject jsonObject = new JSONObject();
-		Iterator<String> iter = jsonObject.keys();
-
-		while(iter.hasNext()){
-			iter.next();
+		if(obj instanceof String){
+			return decompose((String) obj);
 		}
+		if(obj instanceof List){
+			return decomposeArrayList((List<?>) obj);
+		}
+		List<Token> objDefList = new ArrayList<Token>();
 		Class<?> objClass = obj.getClass();
 	    Field[] fields = objClass.getFields();
         log.info("LIST CLASS:: "+ objClass);
@@ -143,18 +147,10 @@ public class DataDecomposer {
 	        if(value!=null){
 	        	Token objDef = null;
 
-	        	if(value.getClass().equals(ArrayList.class)){
+	        	if(value instanceof List){
 		        	log.info("Deconstructing Array list");
-		        	ArrayList<?> list = ((ArrayList<?>)value);
 		        	//return all elements of array
-		        	List<Token> decomposedList = decomposeArrayList(list);
-	        		objDefList.addAll(decomposedList);
-		        }
-	        	else if(value.getClass().equals(ArrayList.class)){
-		        	log.info("Deconstructing Array list");
-		        	ArrayList<?> list = ((ArrayList<?>)value);
-		        	//return all elements of array
-		        	List<Token> decomposedList = decomposeArrayList(list);
+		        	List<Token> decomposedList = decomposeArrayList((List<?>)value);
 	        		objDefList.addAll(decomposedList);
 		        }
 		        else if(value.getClass().equals(String[].class)){
@@ -166,7 +162,7 @@ public class DataDecomposer {
 		        		objDefList.add(objDef);
 		            }
 		        }
-		        else if(value.getClass().equals(Object[].class)){
+		        else if(value instanceof Object[]){
 		        	log.info("Deconstructing Object list");
 
 		        	Object[] array = (Object[]) value;
@@ -183,9 +179,6 @@ public class DataDecomposer {
 		        		objDef = new Token(word);
 		        		objDefList.add(objDef);
 		        	}
-
-	        		//objDef = new Token(value.toString(), field.getType().getSimpleName().replace(".", "").replace("[","").replace("]",""));
-		        	//objDefList.add(objDef);
 		        }
 	        }
 	    }
@@ -210,18 +203,10 @@ public class DataDecomposer {
 			if(value!=null){
 	        	Token objDef = null;
 
-	        	if(value.getClass().equals(ArrayList.class)){
+	        	if(value instanceof List){
 		        	log.info("Deconstructing Array list");
-		        	ArrayList<?> list = ((ArrayList<?>)value);
 		        	//return all elements of array
-		        	List<Token> decomposedList = decomposeArrayList(list);
-	        		objDefList.addAll(decomposedList);
-		        }
-	        	else if(value.getClass().equals(ArrayList.class)){
-		        	log.info("Deconstructing Array list");
-		        	ArrayList<?> list = ((ArrayList<?>)value);
-		        	//return all elements of array
-		        	List<Token> decomposedList = decomposeArrayList(list);
+		        	List<Token> decomposedList = decomposeArrayList((List<?>)value);
 	        		objDefList.addAll(decomposedList);
 		        }
 		        else if(value.getClass().equals(String[].class)){
@@ -233,7 +218,7 @@ public class DataDecomposer {
 		        		objDefList.add(objDef);
 		            }
 		        }
-		        else if(value.getClass().equals(Object[].class)){
+		        else if(value instanceof Object[]){
 		        	log.info("Deconstructing Object list");
 
 		        	Object[] array = (Object[]) value;
@@ -281,7 +266,7 @@ public class DataDecomposer {
 	 * @throws IllegalArgumentException
 	 * @throws IllegalAccessException
 	 */
-	private static List<Token> decomposeArrayList(ArrayList<?> list) throws IllegalArgumentException, IllegalAccessException, NullPointerException {
+	private static List<Token> decomposeArrayList(List<?> list) throws IllegalArgumentException, IllegalAccessException, NullPointerException {
     	List<Token> objDefList = new ArrayList<Token>();
 		if(list == null || list.isEmpty()){
 			return objDefList;

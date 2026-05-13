@@ -47,7 +47,11 @@ public class ImageProcessingService {
 
 	@PostConstruct
 	public void init() {
-		loadOpenCV();
+		try {
+			loadOpenCV();
+		} catch (Throwable t) {
+			log.warn("OpenCV native libraries unavailable on this platform; image endpoints will fail at request time: {}", t.getMessage());
+		}
 	}
 
 	/**

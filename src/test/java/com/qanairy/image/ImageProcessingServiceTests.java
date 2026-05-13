@@ -7,6 +7,7 @@ import java.util.Base64;
 
 import javax.imageio.ImageIO;
 
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -26,7 +27,11 @@ public class ImageProcessingServiceTests {
 
 	@BeforeClass
 	public void setUp() {
-		ImageProcessingService.loadOpenCV();
+		try {
+			ImageProcessingService.loadOpenCV();
+		} catch (Throwable t) {
+			throw new SkipException("OpenCV native libraries unavailable on this platform: " + t.getMessage());
+		}
 		service = new ImageProcessingService();
 		service.init();
 	}
