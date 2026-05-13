@@ -24,7 +24,7 @@ public interface TokenRepository extends Neo4jRepository<Token, Long> {
 	 *
 	 * @return {@link Set} of {@link TokenWeights}
 	 */
-	@Query("MATCH (:Token{value:{value}})-[fw:HAS_RELATED_TOKEN]->(:Token) RETURN fw")
+	@Query("MATCH (s:Token{value:{value}})-[fw:HAS_RELATED_TOKEN]->(t:Token) RETURN s, fw, t")
 	public Set<TokenWeight> getTokenWeights(@Param("value") String value);
 
 	/**
