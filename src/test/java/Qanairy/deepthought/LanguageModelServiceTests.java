@@ -104,6 +104,21 @@ public class LanguageModelServiceTests {
 		assertTrue(distribution.isEmpty());
 	}
 
+	@Test
+	public void skipsEdgesWithNullOrUnnamedEndTokens() {
+		TokenWeight valid = edge("a", "b", 2.0);
+		TokenWeight missing_end = new TokenWeight();
+		missing_end.setToken(new Token("a"));
+		missing_end.setWeight(5.0);
+		TokenWeight unnamed_end = edge("a", null, 9.0);
+		when(token_repo.getTokenWeights("a")).thenReturn(edges(valid, missing_end, unnamed_end));
+
+		Map<String, Double> distribution = service.nextTokenDistribution("a");
+
+		assertEquals(distribution.size(), 1);
+		assertEquals(distribution.get("b"), 1.0, 1e-9);
+	}
+
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void nextTokenDistributionRejectsNullSeed() {
 		service.nextTokenDistribution(null);
