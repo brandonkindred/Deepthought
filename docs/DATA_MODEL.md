@@ -240,11 +240,17 @@ The learnable weights.
 
 - **Lifecycle:**
   - Created in two places:
-    1. `Brain.generatePolicy` cold-start: random `[0.0, 1.0)` weight,
-       persisted via `TokenWeightRepository.save` and/or
-       `TokenRepository.createWeightedConnection`.
-    2. `Brain.learn` cold-start: same `Random.nextDouble()` seed if no
-       edge exists, then the Q-update is applied to the new weight.
+    1. `Brain.generatePolicy` cold-start: builds a transient
+       `TokenWeight` with a random `[0.0, 1.0)` weight, appends it to
+       the input token's `token_weights` list, and calls
+       `TokenRepository.save(input_token)`. OGM cascades the
+       relationship through the parent-token save — neither
+       `TokenWeightRepository.save` nor `createWeightedConnection` is
+       invoked on this path.
+    2. `Brain.learn` cold-start: calls
+       `TokenRepository.createWeightedConnection(...)` (the
+       `MATCH ... CREATE rel` Cypher) directly, then applies the
+       Q-update on the returned `TokenWeight`.
   - Updated only by `/rl/learn` (via `TokenWeightRepository.save` of the
     same relationship instance with mutated `weight`).
   - Read on `/rl/predict`, `/rl/learn`, and **all** `/llm/*` endpoints.

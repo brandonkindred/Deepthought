@@ -500,7 +500,7 @@ will turn into tokens.
 
 | Entry point | Behavior |
 |---|---|
-| `decompose(JSONObject json)` | Iterates keys; tokenizes only **values**. Keys are read for logging but not turned into tokens. Recursively handles nested `JSONObject` / `JSONArray`. Strings are split on whitespace. |
+| `decompose(JSONObject json)` | Iterates keys; tokenizes only **values**. Keys are read for logging but not turned into tokens. **Nested `JSONObject` recurses into `decompose(JSONObject)`. `JSONArray` does NOT recurse** — each element is converted via `Object.toString()` and routed through the `decompose(String)` overload, so an object embedded in an array tokenizes as the raw JSON text of that object (e.g. `[{"k":"v"}]` produces the single token `{"k":"v"}`). Strings are split on whitespace. |
 | `decompose(String text)` | Whitespace split. |
 | `decompose(Object obj)` | Reflective dispatcher for arbitrary objects. |
 | `decompose(HashMap<?, ?>)` | Same key/value behavior as JSONObject. |
@@ -511,9 +511,11 @@ A consequence visible in
 `{"page":"login form"}` yields tokens `login` and `form`. `page` is
 never tokenized.
 
-Every `/rl/*` and `/lr/*-from-tokens` endpoint funnels through this
-class, so changing tokenization here changes behavior across both
-subsystems.
+`/rl/predict`, `/rl/train`, and the two `/lr/*-from-tokens` endpoints
+funnel through this class. `/rl/learn` does **not** — it consumes only
+`memory_id` plus the `token_value` string and never calls
+`DataDecomposer`. Tokenization changes here affect prediction and
+training paths but leave the feedback path untouched.
 
 ---
 
@@ -527,7 +529,7 @@ subsystems.
 | Determinism | reads deterministic; writes random on cold-start | deterministic for greedy; seeded random for sample | deterministic given seed + data | deterministic |
 | Idempotent? | no (cold-start + memory creation) | yes (read-only) | no for train, yes for predict | no |
 | Failure on empty input | crashes in `Brain.predict` (`policy[0]`) | `IllegalArgumentException` | `IllegalArgumentException` | `IllegalArgumentException` |
-| Persistence model | mutable edges in Neo4j | none | Java-serialized Tribuo blob in Neo4j | content-addressed-by-id Neo4j nodes |
+| Persistence model | mutable edges in Neo4j | none | Java-serialized Tribuo blob in Neo4j | append-only Neo4j nodes (no dedup; identical payloads duplicate) |
 | Hot reload of learned state | yes (live edge reads) | yes (live edge reads) | requires re-load by `model_id` | n/a |
 
 ---

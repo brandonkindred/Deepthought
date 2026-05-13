@@ -480,7 +480,7 @@ not referenced from any other production class. Treat it as dormant.
 
 ```mermaid
 flowchart LR
-    dev(["Developer terminal"]) -- "./mvnw spring-boot:run" --> app["JVM on host :8080"]
+    dev(["Developer terminal"]) -- "mvn spring-boot:run" --> app["JVM on host :8080"]
     dev2(["Developer terminal"]) -- "docker compose up -d neo4j" --> n["Neo4j container :7687,:7474"]
     app -- "bolt://localhost:7687" --> n
     swagger["Browser → :8080/swagger-ui.html"] --> app
