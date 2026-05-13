@@ -1,4 +1,4 @@
-package com.qanairy.brain;
+package com.deepthought.brain;
 
 import java.io.IOException;
 import java.util.ArrayList;

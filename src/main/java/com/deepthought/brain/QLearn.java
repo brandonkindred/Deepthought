@@ -1,4 +1,4 @@
-package com.qanairy.brain;
+package com.deepthought.brain;
 
 /**
  * Provides q-learning equation using a constant learning_rate and discount_factor

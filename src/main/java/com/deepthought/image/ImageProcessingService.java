@@ -1,4 +1,4 @@
-package com.qanairy.image;
+package com.deepthought.image;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;

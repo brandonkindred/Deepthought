@@ -1,4 +1,4 @@
-package Qanairy.deepthought.resourceClasses;
+package com.deepthought.resourceClasses;
 
 import java.util.List;
 import java.util.Map;

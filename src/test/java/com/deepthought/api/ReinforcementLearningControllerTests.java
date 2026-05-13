@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,7 +28,7 @@ import com.deepthought.models.edges.Prediction;
 import com.deepthought.models.repository.TokenRepository;
 import com.deepthought.models.repository.MemoryRecordRepository;
 import com.deepthought.models.repository.PredictionRepository;
-import com.qanairy.brain.Brain;
+import com.deepthought.brain.Brain;
 
 @Test(groups = "Regression")
 public class ReinforcementLearningControllerTests {

@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
@@ -21,8 +21,8 @@ import com.deepthought.models.ImageMatrixNode;
 import com.deepthought.models.edges.PartOf;
 import com.deepthought.models.repository.ImageMatrixNodeRepository;
 import com.deepthought.models.repository.PartOfRepository;
-import com.qanairy.api.dto.ImageIngestRequest;
-import com.qanairy.image.ImageProcessingService;
+import com.deepthought.api.dto.ImageIngestRequest;
+import com.deepthought.image.ImageProcessingService;
 
 /**
  * Unit tests for ImageIngestionController. Tests request validation,

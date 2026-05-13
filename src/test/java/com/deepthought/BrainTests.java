@@ -1,4 +1,4 @@
-package Qanairy.deepthought;
+package com.deepthought;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -7,7 +7,7 @@ import java.util.ArrayList;
 
 import org.testng.annotations.Test;
 
-import com.qanairy.brain.Brain;
+import com.deepthought.brain.Brain;
 
 @Test(groups = "Regression")
 public class BrainTests {

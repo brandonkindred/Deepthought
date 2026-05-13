@@ -35,67 +35,100 @@ mvn spring-boot:run
 mvn verify
 ```
 
-**Main class:** `com.qanairy.deepthought.App`
+**Main class:** `com.deepthought.App`
 
 ## Project Structure
 
 ```
 src/main/java/
-├── com/deepthought/models/           # Domain models (Neo4j entities)
-│   ├── Token.java                    # Node entity — atomic knowledge unit
-│   ├── Vocabulary.java               # Token indexing and vector construction
-│   ├── MemoryRecord.java             # Prediction history for experience replay
-│   ├── edges/
-│   │   ├── TokenWeight.java          # Weighted edge (HAS_RELATED_TOKEN)
-│   │   ├── TokenPolicy.java          # Policy edge type
-│   │   └── Prediction.java           # Prediction probability edge (PREDICTION)
-│   ├── repository/                   # Spring Data Neo4j repositories
-│   │   ├── TokenRepository.java      # Token CRUD + custom Cypher queries
-│   │   ├── TokenWeightRepository.java
-│   │   ├── VocabularyRepository.java
-│   │   ├── MemoryRecordRepository.java
-│   │   └── PredictionRepository.java
-│   └── services/
-│       └── TokenService.java         # Token business logic
-├── com/qanairy/
-│   ├── deepthought/App.java          # Spring Boot entry point
-│   ├── api/
-│   │   └── ReinforcementLearningController.java  # REST endpoints at /rl/*
-│   ├── brain/
-│   │   ├── Brain.java                # Core prediction/learning orchestrator
-│   │   ├── QLearn.java               # Q-learning algorithm implementation
-│   │   ├── TokenVector.java          # Elastic vector construction from graph
-│   │   ├── Predict.java              # Prediction interface
-│   │   └── ActionFactory.java        # Action/outcome creation utilities
-│   ├── config/
-│   │   ├── Neo4jConfiguration.java   # Neo4j session/transaction setup
-│   │   └── ConfigService.java        # Configuration management
-│   ├── db/
-│   │   ├── DataDecomposer.java       # JSON-to-Token decomposition
-│   │   └── VocabularyWeights.java    # Vocabulary weight management
-│   └── observableStructs/            # Concurrent data structures
-│       ├── ConcurrentNode.java
-│       ├── ObservableHash.java
-│       └── ObservableQueue.java
+└── com/deepthought/                  # Single root package
+    ├── App.java                      # Spring Boot entry point
+    ├── api/                          # REST controllers
+    │   ├── ReinforcementLearningController.java  # /rl/*
+    │   ├── LanguageModelController.java          # /llm/*
+    │   ├── LogisticRegressionController.java     # /lr/*
+    │   ├── ImageIngestionController.java         # /images/*
+    │   ├── TokenSample.java
+    │   └── dto/
+    │       └── ImageIngestRequest.java
+    ├── brain/
+    │   ├── Brain.java                # Core prediction/learning orchestrator
+    │   ├── QLearn.java               # Q-learning algorithm
+    │   ├── TokenVector.java          # Elastic vector construction
+    │   ├── Predict.java              # Prediction interface
+    │   ├── ActionFactory.java
+    │   ├── LanguageModelService.java # Bigram LM over HAS_RELATED_TOKEN
+    │   └── LogisticRegressionService.java
+    ├── config/
+    │   ├── Neo4jConfiguration.java   # Neo4j session/transaction setup
+    │   └── ConfigService.java        # (dormant helper, not wired in)
+    ├── db/
+    │   ├── DataDecomposer.java       # JSON-to-Token decomposition
+    │   └── VocabularyWeights.java
+    ├── image/
+    │   └── ImageProcessingService.java
+    ├── models/                       # Neo4j entities
+    │   ├── Token.java
+    │   ├── Vocabulary.java
+    │   ├── MemoryRecord.java
+    │   ├── ImageMatrixNode.java
+    │   ├── LogisticRegressionModel.java
+    │   ├── edges/
+    │   │   ├── TokenWeight.java      # HAS_RELATED_TOKEN
+    │   │   ├── TokenPolicy.java      # TOKEN_POLICY (dormant)
+    │   │   ├── Prediction.java       # PREDICTION
+    │   │   └── PartOf.java           # PART_OF
+    │   ├── repository/               # Spring Data Neo4j repositories
+    │   │   ├── TokenRepository.java  # CRUD + custom Cypher
+    │   │   ├── TokenWeightRepository.java
+    │   │   ├── VocabularyRepository.java
+    │   │   ├── MemoryRecordRepository.java
+    │   │   ├── PredictionRepository.java
+    │   │   ├── ImageMatrixNodeRepository.java
+    │   │   ├── PartOfRepository.java
+    │   │   └── LogisticRegressionModelRepository.java
+    │   └── services/
+    │       └── TokenService.java
+    └── observableStructs/            # Concurrent data structures
+        ├── ConcurrentNode.java
+        ├── ObservableHash.java
+        └── ObservableQueue.java
+
 src/test/java/
-├── Qanairy/deepthought/
-│   ├── BrainTests.java               # Brain predict/learn tests (stubs)
-│   └── DataDecomposerTests.java      # JSON decomposition tests
-├── com/deepthought/models/
-│   └── VocabularyTests.java          # Vocabulary indexing tests
-└── resourceClasses/
-    └── SelfContainedTestObject.java  # Test fixture
+└── com/deepthought/                  # Tests mirror prod packages
+    ├── BrainTests.java
+    ├── DataDecomposerTests.java
+    ├── LanguageModelServiceTests.java
+    ├── LogisticRegressionServiceTests.java
+    ├── TokenVectorTests.java
+    ├── api/
+    │   ├── ReinforcementLearningControllerTests.java
+    │   ├── ImageIngestionControllerTests.java
+    │   └── dto/ImageIngestRequestTests.java
+    ├── image/
+    │   └── ImageProcessingServiceTests.java
+    ├── models/                       # Entity tests
+    │   ├── VocabularyTests.java
+    │   ├── MemoryRecordTokenTests.java
+    │   ├── ImageMatrixNodeTests.java
+    │   └── edges/PartOfTests.java
+    ├── observableStructs/
+    │   ├── ConcurrentNodeTests.java
+    │   ├── ObservableHashTests.java
+    │   ├── ObservableQueueTests.java
+    │   └── ObservableStructsTests.java
+    └── resourceClasses/
+        └── SelfContainedTestObject.java
 ```
 
 ## Architecture
 
-### Dual Package Namespaces
+### Package Namespace
 
-The codebase uses two root packages that are both component-scanned:
-- `com.deepthought.models` — Domain model layer (entities, repositories, services)
-- `com.qanairy` — Application layer (API, brain logic, config, utilities)
-
-This is configured in `App.java` via `@ComponentScan(basePackages = {"com.deepthought","com.qanairy"})`.
+All production code lives under the single root package `com.deepthought.*`.
+`App.java` configures `@ComponentScan(basePackages = {"com.deepthought"})`
+(redundant with `@SpringBootApplication`'s implicit scan from the same package,
+but kept explicit).
 
 ### Neo4j Graph Schema
 
@@ -165,7 +198,7 @@ The properties file is templated with commented-out placeholders. Neo4j must be 
 - Maven Surefire is configured to only run tests in the `Regression` group
 - Tests must be annotated with `@Test(groups = "Regression")` to be picked up by `mvn test`
 - Current test coverage is minimal — most test methods are stubs
-- Test packages mirror source: `Qanairy.deepthought` and `com.deepthought.models`
+- Test packages mirror source under `com.deepthought.*`
 
 ## Dependencies (External Services)
 
@@ -175,10 +208,10 @@ The properties file is templated with commented-out placeholders. Neo4j must be 
 
 ## Key Files for Common Tasks
 
-- **Adding a new API endpoint:** `src/main/java/com/qanairy/api/ReinforcementLearningController.java`
-- **Modifying prediction/learning logic:** `src/main/java/com/qanairy/brain/Brain.java`
+- **Adding a new API endpoint:** `src/main/java/com/deepthought/api/`
+- **Modifying prediction/learning logic:** `src/main/java/com/deepthought/brain/Brain.java`
 - **Adding a new entity/relationship:** `src/main/java/com/deepthought/models/` and `src/main/java/com/deepthought/models/edges/`
 - **Adding a new repository query:** `src/main/java/com/deepthought/models/repository/`
-- **Changing Neo4j config:** `src/main/java/com/qanairy/config/Neo4jConfiguration.java`
-- **Modifying JSON decomposition:** `src/main/java/com/qanairy/db/DataDecomposer.java`
+- **Changing Neo4j config:** `src/main/java/com/deepthought/config/Neo4jConfiguration.java`
+- **Modifying JSON decomposition:** `src/main/java/com/deepthought/db/DataDecomposer.java`
 - **Application properties:** `src/main/resources/application.properties`

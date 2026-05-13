@@ -1,4 +1,4 @@
-package com.qanairy.api;
+package com.deepthought.api;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +24,7 @@ import com.deepthought.models.repository.LogisticRegressionModelRepository;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
-import com.qanairy.brain.LogisticRegressionService;
+import com.deepthought.brain.LogisticRegressionService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -32,7 +32,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /**
  *	API endpoints for binary logistic regression. Supports training and predicting on raw
  *	 numeric feature matrices, plus a token-based convenience pair that decomposes JSON
- *	 documents via {@link com.qanairy.db.DataDecomposer} and one-hot encodes them against a
+ *	 documents via {@link com.deepthought.db.DataDecomposer} and one-hot encodes them against a
  *	 vocabulary persisted with the model.
  */
 @RestController

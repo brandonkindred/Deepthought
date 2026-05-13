@@ -1,4 +1,4 @@
-package Qanairy.deepthought;
+package com.deepthought;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -22,7 +22,7 @@ import org.testng.annotations.Test;
 import com.deepthought.models.Token;
 import com.deepthought.models.edges.TokenWeight;
 import com.deepthought.models.repository.TokenRepository;
-import com.qanairy.brain.LanguageModelService;
+import com.deepthought.brain.LanguageModelService;
 
 @Test(groups = "Regression")
 public class LanguageModelServiceTests {

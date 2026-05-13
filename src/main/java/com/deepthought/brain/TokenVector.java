@@ -1,4 +1,4 @@
-package com.qanairy.brain;
+package com.deepthought.brain;
 
 import java.util.HashMap;
 import java.util.List;
