@@ -278,7 +278,8 @@ graph LR
 ```
 
 - **`HAS_RELATED_TOKEN`** edges are the learnable weights — they are read and written on every learn call. This is the *only* relationship type that `/rl/learn` writes to Neo4j.
-- **`PREDICTED`** and **`PREDICTION`** are written by `/rl/predict` and only *read* during learn.
+- **`PREDICTED`** is written by `/rl/predict` and read during learn via `memory.getPredictedToken()` (used to pick the reward bucket).
+- **`PREDICTION`** edges are written by `/rl/predict` for audit but `Brain.learn` never inspects them — it only reads `getPredictedToken`, `getOutputTokenKeys`, and `getInputTokenValues`. OGM may hydrate the relationship list when `findById` runs, but that is just session bookkeeping; learning works correctly even if the `PREDICTION` edges are missing.
 - **`DESIRED_TOKEN`** — `Brain.learn` calls `memory.setDesiredToken(actual_token)` on the in-memory `MemoryRecord` (`Brain.java:127`), but **never calls `memory_repo.save(memory)`**, so this relationship is *not* persisted to Neo4j today. The mutation is effectively dead code; see §10. The schema diagram above intentionally omits it for that reason.
 
 ### Cypher executed during a learn call

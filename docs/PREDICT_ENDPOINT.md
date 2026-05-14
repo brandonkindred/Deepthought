@@ -252,8 +252,11 @@ Source: `ReinforcementLearningController.java:71-164`.
 8. **Persist `Prediction` edges** — one per output token, weighted by the
    normalized probability (controller `:156-162`):
    `(:MemoryRecord)-[:PREDICTION {weight}]->(:Token)`.
-9. **Return** the saved `MemoryRecord` as JSON. The client receives the full
-   record including `id`, `predicted_token`, and the `predictions` list.
+9. **Return** the saved `MemoryRecord` as JSON. Jackson serializes the
+   getters with default camelCase property naming, so the response body
+   uses `id`, `predictedToken`, and `predictions` (not the
+   snake_case `predicted_token` / `predicted_token`-style names used
+   inside the entity / Cypher). See §3 for the field-name crosswalk.
 
 ### 5.3 Sequence diagram
 
@@ -282,8 +285,9 @@ sequenceDiagram
         alt edge exists
             TR-->>B: TokenWeight (existing)
         else edge missing
-            B->>TR: save(new TokenWeight, random weight)
-            TR->>N: CREATE edge
+            B->>B: build transient TokenWeight,<br/>weight = Random.nextDouble(),<br/>append to input_token.token_weights
+            B->>TR: save(input_token)
+            TR->>N: upsert Token by internal id +<br/>CREATE HAS_RELATED_TOKEN edge<br/>(OGM cascades the new TokenWeight;<br/>no value-keyed MERGE — duplicate races possible)
         end
     end
     B-->>Ctl: double[][] policy

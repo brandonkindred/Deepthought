@@ -116,14 +116,18 @@ That's it. You now have a running graph-based reasoning engine.
 
 ## Documentation
 
-Deepthought ships with focused, deep-dive documentation alongside this README:
+Deepthought ships with focused, deep-dive documentation alongside this README. Start with the [`docs/`](docs/README.md) index for a guided tour:
 
 | Document | What it covers |
 |---|---|
-| **[API_SPEC.md](API_SPEC.md)** | High-level technical overview of the API, core concepts (datums, edges, graphs), pipeline, and use cases |
-| **[LEARN_ENDPOINT.md](LEARN_ENDPOINT.md)** | Full walkthrough of `POST /rl/learn` — HTTP contract, sequence diagrams, Q-learning math, Cypher executed, before/after graph state |
-| **[TRAIN_ENDPOINT.md](TRAIN_ENDPOINT.md)** | Architecture & process reference for `POST /rl/train`, including current-state observations and known gaps |
-| **[CODE_REVIEW_PLAN.md](CODE_REVIEW_PLAN.md)** | Code review findings and remediation plan covering API behavior, numerical correctness, and build reproducibility |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | System architecture: C4 diagrams, all four subsystems (`/rl`, `/llm`, `/lr`, `/images`), networking & deployment topology, cross-cutting use cases |
+| **[docs/DATA_MODEL.md](docs/DATA_MODEL.md)** | Every Neo4j node label, relationship type, property, and verbatim Cypher query the app issues, plus recommended constraints |
+| **[docs/BRAIN_SUBSYSTEM.md](docs/BRAIN_SUBSYSTEM.md)** | Engineering details for Brain/QLearn, LanguageModelService, LogisticRegressionService, and ImageProcessingService |
+| **[docs/API_SPEC.md](docs/API_SPEC.md)** | High-level technical overview of the API, core concepts (datums, edges, graphs), pipeline, and use cases |
+| **[docs/PREDICT_ENDPOINT.md](docs/PREDICT_ENDPOINT.md)** | Full walkthrough of `POST /rl/predict` — HTTP contract, sequence diagrams, request lifecycle, error/edge cases |
+| **[docs/LEARN_ENDPOINT.md](docs/LEARN_ENDPOINT.md)** | Full walkthrough of `POST /rl/learn` — HTTP contract, sequence diagrams, Q-learning math, Cypher executed, before/after graph state |
+| **[docs/TRAIN_ENDPOINT.md](docs/TRAIN_ENDPOINT.md)** | Architecture & process reference for `POST /rl/train`, including current-state observations and known gaps |
+| **[docs/CODE_REVIEW_PLAN.md](docs/CODE_REVIEW_PLAN.md)** | Code review findings and remediation plan covering API behavior, numerical correctness, and build reproducibility |
 | **[CLAUDE.md](CLAUDE.md)** | Codebase orientation for AI assistants (project layout, conventions, key files) |
 | **[openapi.yaml](openapi.yaml)** | Machine-readable OpenAPI 3 spec for all endpoints |
 | **[Deepthought API.postman_collection.json](Deepthought%20API.postman_collection.json)** | Postman collection for manual API exploration |
@@ -156,8 +160,8 @@ The current implementation exposes two controller surfaces:
 | Endpoint | Purpose |
 |---|---|
 | `POST /rl/predict` | Decompose JSON input into tokens, build a policy matrix from graph weights, return a `MemoryRecord` with prediction edges |
-| `POST /rl/learn` | Apply feedback to a previously created `MemoryRecord`; update token connection weights via Q-learning. **See [LEARN_ENDPOINT.md](LEARN_ENDPOINT.md)** |
-| `POST /rl/train` | Decompose JSON + label into a vocabulary scaffold. **Currently a stub — see [TRAIN_ENDPOINT.md](TRAIN_ENDPOINT.md)** |
+| `POST /rl/learn` | Apply feedback to a previously created `MemoryRecord`; update token connection weights via Q-learning. **See [docs/LEARN_ENDPOINT.md](docs/LEARN_ENDPOINT.md)** |
+| `POST /rl/train` | Decompose JSON + label into a vocabulary scaffold. **Currently a stub — see [docs/TRAIN_ENDPOINT.md](docs/TRAIN_ENDPOINT.md)** |
 
 ### Image Ingestion API (`/images`)
 
@@ -334,7 +338,7 @@ Time T₃: NEXT PREDICTION (same inputs)
 └─ Predict: "submit" — learned!
 ```
 
-For a complete walkthrough including Cypher executed, reward table, and known caveats, see **[LEARN_ENDPOINT.md](LEARN_ENDPOINT.md)**.
+For a complete walkthrough including Cypher executed, reward table, and known caveats, see **[docs/LEARN_ENDPOINT.md](docs/LEARN_ENDPOINT.md)**.
 
 ---
 
@@ -342,9 +346,9 @@ For a complete walkthrough including Cypher executed, reward table, and known ca
 
 | Method | Path | Status | Description | Deep Dive |
 |---|---|---|---|---|
-| `POST` | `/rl/predict` | `200 OK` | Generate prediction from JSON input + output labels; persist `MemoryRecord` | [API_SPEC.md](API_SPEC.md) |
-| `POST` | `/rl/learn` | `202 Accepted` / `404 Not Found` | Apply feedback for a `MemoryRecord`; update edge weights via Q-learning | [LEARN_ENDPOINT.md](LEARN_ENDPOINT.md) |
-| `POST` | `/rl/train` | `200 OK` | Decompose JSON + label (currently a no-op stub — see deep dive) | [TRAIN_ENDPOINT.md](TRAIN_ENDPOINT.md) |
+| `POST` | `/rl/predict` | `200 OK` | Generate prediction from JSON input + output labels; persist `MemoryRecord` | [docs/PREDICT_ENDPOINT.md](docs/PREDICT_ENDPOINT.md) |
+| `POST` | `/rl/learn` | `202 Accepted` / `404 Not Found` | Apply feedback for a `MemoryRecord`; update edge weights via Q-learning | [docs/LEARN_ENDPOINT.md](docs/LEARN_ENDPOINT.md) |
+| `POST` | `/rl/train` | `200 OK` | Decompose JSON + label (currently a no-op stub — see deep dive) | [docs/TRAIN_ENDPOINT.md](docs/TRAIN_ENDPOINT.md) |
 | `POST` | `/images/ingest` | `200 OK` | Ingest base64 image; create derived nodes (outline, PCA, b/w, object crops) | — |
 
 > Interactive API docs (Swagger UI) are available at <http://localhost:8080/swagger-ui.html> when the app is running. The OpenAPI 3 spec is checked in at [`openapi.yaml`](openapi.yaml).
@@ -687,7 +691,7 @@ Rather than global attention (`O(n²)` for sequence length `n`), Deepthought use
 - 🔄 Graph attention optimization
 - 🔄 Benchmarking against GPT/Claude
 - 🔄 Multi-modal node support (images, audio)
-- 🔄 Stabilizing `/rl/train` (currently a no-op stub — see [TRAIN_ENDPOINT.md](TRAIN_ENDPOINT.md))
+- 🔄 Stabilizing `/rl/train` (currently a no-op stub — see [docs/TRAIN_ENDPOINT.md](docs/TRAIN_ENDPOINT.md))
 
 ### Planned
 
@@ -697,7 +701,7 @@ Rather than global attention (`O(n²)` for sequence length `n`), Deepthought use
 - ⬜ Reasoning cache optimization
 - ⬜ Fine-grained explanation controls
 
-> See [CODE_REVIEW_PLAN.md](CODE_REVIEW_PLAN.md) for prioritized remediation work in flight.
+> See [docs/CODE_REVIEW_PLAN.md](docs/CODE_REVIEW_PLAN.md) for prioritized remediation work in flight.
 
 ---
 
@@ -881,8 +885,9 @@ top -p $(pgrep java)
 
 - **Issues** — open a GitHub issue with full error logs
 - **Discussions** — GitHub Discussions for questions
-- **API reference** — see [API_SPEC.md](API_SPEC.md) and [openapi.yaml](openapi.yaml)
-- **Endpoint deep dives** — [LEARN_ENDPOINT.md](LEARN_ENDPOINT.md), [TRAIN_ENDPOINT.md](TRAIN_ENDPOINT.md)
+- **API reference** — see [docs/API_SPEC.md](docs/API_SPEC.md) and [openapi.yaml](openapi.yaml)
+- **Architecture** — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/BRAIN_SUBSYSTEM.md](docs/BRAIN_SUBSYSTEM.md)
+- **Endpoint deep dives** — [docs/PREDICT_ENDPOINT.md](docs/PREDICT_ENDPOINT.md), [docs/LEARN_ENDPOINT.md](docs/LEARN_ENDPOINT.md), [docs/TRAIN_ENDPOINT.md](docs/TRAIN_ENDPOINT.md)
 
 ---
 
