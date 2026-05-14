@@ -24,7 +24,7 @@ erDiagram
     MemoryRecord ||--o| Token : "DESIRED_TOKEN*"
     MemoryRecord ||--o{ TokenPolicy : "TOKEN_POLICY*"
     Token ||--o{ TokenPolicy : "end of TOKEN_POLICY*"
-    ImageMatrixNode ||--o| ImageMatrixNode : "PART_OF (derived → original)"
+    ImageMatrixNode ||--o{ ImageMatrixNode : "PART_OF (derived → original)"
 
     Token {
         Long id
@@ -52,6 +52,7 @@ erDiagram
         double weight
     }
     TokenPolicy {
+        Long relationshipId
         StringList policy_tokens
         DoubleList policy_weights
         double reward
@@ -295,8 +296,9 @@ The fanout of one `MemoryRecord` to each scored candidate.
 - **Source:** `src/main/java/com/deepthought/models/edges/TokenPolicy.java`
 - **OGM annotation:** `@RelationshipEntity(type = "TOKEN_POLICY")`
 - **Endpoints:** `@StartNode MemoryRecord`, `@EndNode Token`
-- **Properties:** `policy_tokens : List<String>`, `policy_weights :
-  List<Double>`, `reward : double`
+- **Properties:** `relationshipId : Long` (`@Id @GeneratedValue`),
+  `policy_tokens : List<String>`, `policy_weights : List<Double>`,
+  `reward : double`
 - **Lifecycle:** No code path constructs or saves this relationship
   entity today. It is reserved schema only.
 

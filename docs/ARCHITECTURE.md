@@ -276,9 +276,15 @@ Notes:
   `Neo4jConfiguration.java` so lazy-loaded relationships on entities can
   still be traversed in the controller after the repository call returns.
 - Each repository call gets its own Bolt round-trip — there is no
-  batching layer. `/rl/predict` and `/rl/learn` are deliberately
-  per-cell, so an N×M cold-start prediction does N·M round trips. This
-  is the dominant bottleneck for cold inputs.
+  batching layer. `/rl/predict` is per-cell, and on a fully cold
+  N×M matrix `Brain.generatePolicy` does at least two round-trips per
+  pair (`getConnectedTokens` plus `token_repo.save(input_token)`, with
+  an extra `findByValue` when the input token is brand new), so
+  cold-start cost is roughly **2–3 · N · M** round-trips before the
+  controller adds `memory_repo.save` and one
+  `prediction_repo.save` per output candidate. `/rl/learn` is also
+  per-cell. Either way, this is the dominant bottleneck for cold
+  inputs.
 
 ---
 
@@ -686,8 +692,12 @@ Notes:
 - `Vocabulary` nodes are declared and have a repository, but the only
   code that constructs them is `Brain.train`, which **does not
   persist** them. See [`TRAIN_ENDPOINT.md`](./TRAIN_ENDPOINT.md).
-- `LogisticRegressionModel` is the only node *not* connected by any
-  edge — it is a self-contained, queryable model artifact.
+- `LogisticRegressionModel` and `Vocabulary` are both island nodes — no
+  outgoing `@Relationship` fields and no `@RelationshipEntity` points
+  at either label, so any persisted instance sits unconnected.
+  `LogisticRegressionModel` is intentionally so (a self-contained,
+  queryable model artifact); `Vocabulary` is so only because nothing
+  in production wires it into a relationship today.
 
 ---
 

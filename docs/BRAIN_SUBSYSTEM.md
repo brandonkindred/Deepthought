@@ -106,10 +106,13 @@ Engineering notes:
 - **N·M Bolt round-trips.** No batching. Inputs and outputs above a few
   dozen each will visibly bottleneck.
 - **Inner-loop edge resolution.** When a `HAS_RELATED_TOKEN` exists,
-  the code iterates `tokens.get(0).getTokenWeights()` to find the one
-  whose `end_token` matches the requested output. If multiple edges
-  exist between the same pair (which can happen because there is no
-  uniqueness constraint), the first matching one wins.
+  the code iterates `tokens.get(0).getTokenWeights()` and assigns
+  `weight = token_weight.getWeight()` for every entry whose
+  `end_token` matches the requested output. There is **no `break`**, so
+  if multiple edges exist between the same pair (which can happen
+  because there is no uniqueness constraint), the **last** matching
+  edge in OGM's hydration order wins — and that order is not
+  guaranteed to be stable across runs.
 
 ### 2.4 `Brain.learn(long memory_id, Token actual_token)`
 
@@ -441,9 +444,9 @@ node property.
 |---|---|
 | `ORIGINAL` | Just the downscaled RGB matrix from `decodeToRgbMatrix`. |
 | `OUTLINE` | RGB → grayscale (`COLOR_BGR2GRAY`) → 3×3 Gaussian blur → `Imgproc.Canny(blurred, edges, 50, 150)` → back to RGB. |
-| `PCA` | Each pixel as 3D vector → centered → covariance → `EigenDecomposition` → project onto top components → reconstruct. |
+| `PCA` | Flatten the RGB matrix to an `n × 3` `RealMatrix` (one row per pixel) → subtract the per-channel mean → form the 3×3 covariance via `Mᵀ·M / (n-1)` → `EigenDecomposition(cov)` → **multiply the centered matrix by `eig.getV()`** (no top-component selection, no reconstruction back through the component matrix). The three transformed columns are min/max-scaled to `[0, 255]` independently and written to R/G/B. |
 | `BLACK_WHITE` | Per-pixel grayscale `gray = 0.299·R + 0.587·G + 0.114·B`, clamped to `[0, 255]`. The same `gray` value is written to all three RGB channels — the result is a grayscale image (R=G=B), **not** a binary mask. No threshold is applied. |
-| `CROPPED_OBJECT` | RGB → grayscale → `findContours(..., RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)` → bounding rectangle per contour → filter tiny boxes → crop. |
+| `CROPPED_OBJECT` | RGB → grayscale (`COLOR_BGR2GRAY`) → **5×5 Gaussian blur** → **`Imgproc.threshold(blurred, binary, 0, 255, THRESH_BINARY + THRESH_OTSU)`** → `findContours(binary, ..., RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)` → reject contours with `area < (rows · cols) / 100` → bounding rectangle per surviving contour → crop. |
 
 All OpenCV `Mat` objects are explicitly `.release()`'d at the end of
 each method to avoid native-memory leaks.
