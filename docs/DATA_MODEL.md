@@ -509,15 +509,21 @@ RETURN a, r, b;
 ```cypher
 MATCH (o:ImageMatrixNode {type: 'ORIGINAL'})
 OPTIONAL MATCH (derived:ImageMatrixNode)-[:PART_OF]->(o)
-RETURN o.id, o.width, o.height, collect({id: derived.id, type: derived.type}) AS derived;
+RETURN id(o) AS id, o.width, o.height,
+       collect({id: id(derived), type: derived.type}) AS derived;
 ```
+
+> Note: `ImageMatrixNode` (and every other `@NodeEntity` in this codebase)
+> uses `@Id @GeneratedValue` on a `Long id` field, which maps to Neo4j's
+> internal node id rather than a stored `id` property. Use `id(node)`
+> in Cypher, not `node.id`.
 
 ### 6.6 Find image derivatives by type
 
 ```cypher
 MATCH (d:ImageMatrixNode)-[:PART_OF]->(o:ImageMatrixNode {type: 'ORIGINAL'})
 WHERE d.type = 'CROPPED_OBJECT'
-RETURN o.id, count(d) AS num_objects;
+RETURN id(o) AS id, count(d) AS num_objects;
 ```
 
 ### 6.7 List trained logistic-regression models
@@ -577,8 +583,11 @@ For long-running deployments a retention strategy is needed:
 
 ```cypher
 // Example: delete MemoryRecords older than 30 days (with their PREDICTION edges)
+// MemoryRecord.date is a java.util.Date that Spring Data Neo4j / OGM 3.2
+// persists as an ISO-8601 string, so it must be parsed via datetime()
+// before comparing to a temporal value.
 MATCH (m:MemoryRecord)
-WHERE m.date < datetime() - duration({days: 30})
+WHERE datetime(m.date) < datetime() - duration({days: 30})
 DETACH DELETE m;
 
 // Example: keep only the most recent ORIGINAL per logical-image key
