@@ -531,7 +531,7 @@ training paths but leave the feedback path untouched.
 | Write path | cold-start random + Q-update | none | Tribuo SGD fit + Neo4j save | save matrix nodes + PART_OF |
 | Determinism | reads deterministic **only when there is at most one `HAS_RELATED_TOKEN` edge per `(in, out)` pair** — see §2.3 on duplicate-edge handling; writes random on cold-start | deterministic for greedy; seeded random for sample | deterministic given seed + data | deterministic |
 | Idempotent? | no (cold-start + memory creation) | yes (read-only) | no for train, yes for predict | no |
-| Failure on empty input | crashes in `Brain.predict` (`policy[0]`) | `IllegalArgumentException` | `IllegalArgumentException` | `IllegalArgumentException` |
+| Failure on empty input | crashes in `Brain.predict` (`policy[0]`) | only `generate` rejects empty seed (`IllegalArgumentException` → 400); `distribution` and `predict-next` accept empty/missing seeds and return 200 with an empty result (null token) — only `seed == null` raises | `IllegalArgumentException` | `IllegalArgumentException` |
 | Persistence model | mutable edges in Neo4j | none | Java-serialized Tribuo blob in Neo4j | append-only Neo4j nodes (no dedup; identical payloads duplicate) |
 | Hot reload of learned state | yes (live edge reads) | yes (live edge reads) | requires re-load by `model_id` | n/a |
 
