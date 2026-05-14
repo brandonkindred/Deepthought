@@ -287,8 +287,9 @@ sequenceDiagram
         alt edge exists
             TR-->>B: TokenWeight (existing)
         else edge missing
-            B->>TR: save(new TokenWeight, random weight)
-            TR->>N: CREATE edge
+            B->>B: build transient TokenWeight,<br/>weight = Random.nextDouble(),<br/>append to input_token.token_weights
+            B->>TR: save(input_token)
+            TR->>N: MERGE Token + CREATE edge<br/>(OGM cascades the new TokenWeight)
         end
     end
     B-->>Ctl: double[][] policy
