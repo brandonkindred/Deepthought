@@ -245,7 +245,6 @@ sequenceDiagram
     participant C as HTTP Client
     participant Tomcat as Embedded Tomcat
     participant DS as DispatcherServlet
-    participant OSV as OpenSessionInViewInterceptor
     participant Ctl as Controller
     participant Svc as Brain / *Service
     participant Repo as Spring Data Neo4j Repository
@@ -254,27 +253,32 @@ sequenceDiagram
 
     C->>Tomcat: HTTP POST /rl/predict (?input&output_tokens)
     Tomcat->>DS: dispatch
-    DS->>OSV: preHandle — open OGM Session
     DS->>Ctl: handler method
     Ctl->>Svc: domain call
     Svc->>Repo: derived / @Query method
-    Repo->>SF: build Cypher
+    Repo->>SF: open OGM session<br/>build Cypher
     SF->>N: Bolt request
     N-->>SF: result rows
     SF-->>Repo: hydrated entity / relationship
     Repo-->>Svc: result
     Svc-->>Ctl: result
     Ctl-->>DS: response body
-    DS->>OSV: afterCompletion — close OGM Session
     DS-->>Tomcat: HTTP response
     Tomcat-->>C: 200 / 202 / 400 / 404 / 500
 ```
 
 Notes:
 
-- `OpenSessionInViewInterceptor` is wired up in
-  `Neo4jConfiguration.java` so lazy-loaded relationships on entities can
-  still be traversed in the controller after the repository call returns.
+- **No Open-Session-in-View.** `Neo4jConfiguration` declares an
+  `OpenSessionInViewInterceptor` bean, but no
+  `WebMvcConfigurer.addInterceptors` (or `OpenSessionInViewFilter`)
+  registers it, and `App` excludes Spring Boot's
+  `Neo4jDataAutoConfiguration` (which would otherwise auto-register
+  the filter when `spring.data.neo4j.open-in-view=true`). Each
+  repository call opens and closes its own OGM session, so lazy-loaded
+  relationships are **not** available in the controller after the
+  repository call returns — controllers must read everything they
+  need while the repository call is still on the stack.
 - Each repository call gets its own Bolt round-trip — there is no
   batching layer. `/rl/predict` is per-cell, and on a fully cold
   N×M matrix `Brain.generatePolicy` does at least two round-trips per
@@ -750,9 +754,13 @@ thread-safe primitives, but **none of them are wired into any
 controller or service today** — they are scaffolding left over from
 earlier experiments.
 
-`Neo4jConfiguration` enables `OpenSessionInViewInterceptor`, so OGM
-sessions are pinned to the request thread for the duration of the
-controller method.
+`Neo4jConfiguration` declares an `OpenSessionInViewInterceptor` bean
+but never registers it (no `WebMvcConfigurer.addInterceptors`, no
+auto-registering `OpenSessionInViewFilter`), and `App` excludes
+`Neo4jDataAutoConfiguration`, so the OSIV mechanism is **inactive**.
+Each repository call opens and closes its own OGM session; lazy-loaded
+relationships are not available in the controller after the
+repository call returns.
 
 ### 12.4 Idempotency
 
