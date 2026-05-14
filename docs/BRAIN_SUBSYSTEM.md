@@ -529,7 +529,7 @@ training paths but leave the feedback path untouched.
 | Parameters live in | `HAS_RELATED_TOKEN.weight` | (reuses RL params) | `LogisticRegressionModel.model_bytes` (Tribuo) | n/a — pre-processing |
 | Read path | column-sum + L1 normalize | clamp-neg + L1 normalize per seed | Tribuo `Model<Label>.predict` | n/a |
 | Write path | cold-start random + Q-update | none | Tribuo SGD fit + Neo4j save | save matrix nodes + PART_OF |
-| Determinism | reads deterministic; writes random on cold-start | deterministic for greedy; seeded random for sample | deterministic given seed + data | deterministic |
+| Determinism | reads deterministic **only when there is at most one `HAS_RELATED_TOKEN` edge per `(in, out)` pair** — see §2.3 on duplicate-edge handling; writes random on cold-start | deterministic for greedy; seeded random for sample | deterministic given seed + data | deterministic |
 | Idempotent? | no (cold-start + memory creation) | yes (read-only) | no for train, yes for predict | no |
 | Failure on empty input | crashes in `Brain.predict` (`policy[0]`) | `IllegalArgumentException` | `IllegalArgumentException` | `IllegalArgumentException` |
 | Persistence model | mutable edges in Neo4j | none | Java-serialized Tribuo blob in Neo4j | append-only Neo4j nodes (no dedup; identical payloads duplicate) |

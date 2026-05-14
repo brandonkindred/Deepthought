@@ -416,9 +416,15 @@ MATCH (v:Vocabulary) WHERE v.size < $maxSize DETACH DELETE v RETURN count(v)
 MATCH (v:Vocabulary) SET v.size = size(v.valueList)
 ```
 
-`deleteSmallVocabularies` is the only destructive operation declared
-anywhere in the repository layer; everything else in the data tier is
-non-destructive.
+`deleteSmallVocabularies` is the only **custom** destructive query
+declared in the repository layer. Note that every repository here also
+inherits the standard destructive operations from `Neo4jRepository`
+(`deleteById(Long)`, `delete(T)`, `deleteAll(Iterable<? extends T>)`,
+`deleteAll()`) and the corresponding existence/find/save APIs — the
+inherited `delete*` methods compile to `DETACH DELETE` per §4.3.
+Nothing in production wires `deleteAll()` or `deleteById` into a code
+path today, but operators with a hydrated repository bean can invoke
+them.
 
 ### 4.3 Other repositories
 
