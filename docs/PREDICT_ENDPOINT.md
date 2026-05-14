@@ -257,8 +257,11 @@ Source: `ReinforcementLearningController.java:71-164`.
 8. **Persist `Prediction` edges** — one per output token, weighted by the
    normalized probability (controller `:156-162`):
    `(:MemoryRecord)-[:PREDICTION {weight}]->(:Token)`.
-9. **Return** the saved `MemoryRecord` as JSON. The client receives the full
-   record including `id`, `predicted_token`, and the `predictions` list.
+9. **Return** the saved `MemoryRecord` as JSON. Jackson serializes the
+   getters with default camelCase property naming, so the response body
+   uses `id`, `predictedToken`, and `predictions` (not the
+   snake_case `predicted_token` / `predicted_token`-style names used
+   inside the entity / Cypher). See §3 for the field-name crosswalk.
 
 ### 5.3 Sequence diagram
 
