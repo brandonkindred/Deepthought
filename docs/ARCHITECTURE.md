@@ -156,7 +156,7 @@ flowchart TB
     Brain --> TR
     Brain --> TWR
     Brain --> MR
-    Brain --> TV
+    TV -. "legacy helper,<br/>not on runtime path" .- Brain
 
     TR -.-> Neo
     TWR -.-> Neo

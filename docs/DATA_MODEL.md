@@ -336,8 +336,9 @@ MATCH (t:Token { value: $value }) RETURN t
 MATCH (s:Token{value:{value}})-[fw:HAS_RELATED_TOKEN]->(t:Token)
 RETURN s, fw, t
 ```
-Used by `LanguageModelService` to build per-seed distributions and by
-`Brain` for graph traversal.
+Used by `LanguageModelService.nextTokenDistribution` to build per-seed
+distributions. `Brain` does **not** call this method — its RL traversal
+goes through `getConnectedTokens` (see below).
 
 ```cypher
 // TokenRepository.getConnectedTokens
