@@ -154,7 +154,7 @@ The audit trail for a single `/rl/predict` call.
   | `id` | `Long` | `@Id @GeneratedValue` |
   | `date` | `Date` | Set in constructor to `new Date()` |
   | `input_token_values` | `List<String>` | The scrubbed, deduped input keys |
-  | `output_token_values` | `String[]` | The exact output labels scored, in order. **Getter is `getOutputTokenKeys()`** — this is what the JSON-serialized API response field is named (`outputTokenKeys`). |
+  | `output_token_values` | `String[]` | The output labels scored, in order, **after the controller's bracket-strip pass**: for any label not already present in Neo4j, `ReinforcementLearningController` strips literal `[` and `]` characters before constructing the `Token`. The stored value is whatever `Token.getValue()` returns, so for a request like `output_tokens=[button]` you get `button`, not `[button]`. Existing tokens (found via `findByValue`) keep their stored value verbatim. **Getter is `getOutputTokenKeys()`** — the JSON-serialized API response field is named `outputTokenKeys`. |
   | `policy_matrix_json` | `String` | Gson-serialized `double[][]`. The getter `getPolicyMatrix()` deserializes on read; the setter serializes on write |
 
 - **Outgoing relationship fields:**
@@ -426,21 +426,41 @@ Nothing in production wires `deleteAll()` or `deleteById` into a code
 path today, but operators with a hydrated repository bean can invoke
 them.
 
-### 4.3 Other repositories
+### 4.3 Node-entity repositories (inherited CRUD only)
 
-The remaining repositories (`TokenWeightRepository`,
-`MemoryRecordRepository`, `PredictionRepository`,
-`ImageMatrixNodeRepository`, `PartOfRepository`,
-`LogisticRegressionModelRepository`) extend `Neo4jRepository<T, Long>`
-and use only the inherited CRUD operations:
+`MemoryRecordRepository`, `ImageMatrixNodeRepository`, and
+`LogisticRegressionModelRepository` are repositories over
+`@NodeEntity` types and extend `Neo4jRepository<T, Long>` without
+declaring custom queries. Their inherited methods compile to
+node-keyed Cypher:
 
 | Method | Effective Cypher |
 |---|---|
-| `save(T entity)` | OGM-managed `MERGE`/`CREATE` + property `SET` |
+| `save(T entity)` | OGM upsert keyed on the entity's internal `Long id` field (new entities get a fresh node; existing entities have their properties updated). No value-keyed `MERGE` is emitted, so concurrent saves with the same domain key can produce duplicates. |
 | `findById(Long id)` | `MATCH (n:<Label>) WHERE id(n) = $id OPTIONAL MATCH (n)-[r]-(o) RETURN n, r, o` (OGM relationship hydration depth ≤ 1 by default) |
 | `findAll()` | `MATCH (n:<Label>) RETURN n` |
 | `deleteById(Long)` | `MATCH (n) WHERE id(n) = $id DETACH DELETE n` |
 | `count()` | `MATCH (n:<Label>) RETURN count(n)` |
+
+### 4.4 Relationship-entity repositories (inherited CRUD only)
+
+`TokenWeightRepository`, `PredictionRepository`, and `PartOfRepository`
+are repositories over `@RelationshipEntity` types. They also extend
+`Neo4jRepository<T, Long>` and declare no custom queries, but the
+inherited methods target *relationships* by relationship id, not nodes
+by label. The effective Cypher shapes therefore differ:
+
+| Method | Effective Cypher |
+|---|---|
+| `save(R rel)` | OGM upsert of the relationship keyed on its internal `Long` relationship id, plus property `SET`. The start/end nodes must already exist. |
+| `findById(Long id)` | `MATCH ()-[r:<TYPE>]->() WHERE id(r) = $id RETURN r` (OGM also hydrates `@StartNode` and `@EndNode` to depth 1) |
+| `findAll()` | `MATCH ()-[r:<TYPE>]->() RETURN r` |
+| `deleteById(Long)` | `MATCH ()-[r]->() WHERE id(r) = $id DELETE r` (delete-the-edge, not `DETACH DELETE` the endpoints) |
+| `count()` | `MATCH ()-[r:<TYPE>]->() RETURN count(r)` |
+
+Operators reading or pruning these tables via Cypher should use the
+relationship variants — running the node-CRUD patterns from §4.3
+against a relationship type silently matches nothing.
 
 ---
 

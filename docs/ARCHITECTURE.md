@@ -325,10 +325,16 @@ flowchart LR
 - Learning is localized: `/rl/learn` updates only `HAS_RELATED_TOKEN`
   edges from the `MemoryRecord`'s input keys to its output keys. The
   graph elsewhere is untouched.
-- The Q-update is the textbook form
+- The Q-update used here is a custom accumulator:
   `Q' = Q + α·(R + γ·Q_future)` with `α=γ=0.1`, `Q_future` hard-coded
-  to `1.0`. See [`LEARN_ENDPOINT.md`](./LEARN_ENDPOINT.md) §6 for the
-  full reward table and the `Math.abs` caveat.
+  to `1.0`. **This is *not* textbook Q-learning** — the classical
+  Bellman update is `Q' = Q + α·(R + γ·max_a' Q(s',a') − Q)` (note the
+  `− Q` term that drives the value toward the TD target). `QLearn`
+  drops that term and never recomputes `max_a' Q`, so `Q` accumulates
+  rather than converges; without `Math.abs` it would also drift in
+  whichever direction the rewards point. See
+  [`LEARN_ENDPOINT.md`](./LEARN_ENDPOINT.md) §6 for the full reward
+  table and the `Math.abs` caveat.
 
 ### 7.2 Language Model (`/llm/*`)
 
@@ -781,7 +787,7 @@ repository call returns.
 | Neo4j unreachable on startup | Spring Boot bean wiring fails → process exits | `docker-compose` `depends_on.condition: service_healthy` |
 | Neo4j unreachable mid-request | Spring Data Neo4j throws → 500 | None — clients must retry |
 | `/rl/predict` with all input tokens scrubbed | `Brain.predict` dereferences `policy[0]` of a zero-row matrix → `ArrayIndexOutOfBoundsException` → 500 | Pass non-empty input that doesn't fully overlap with `output_tokens` |
-| Very large image | Decode to RGB matrix + downscale to ≤512px is memory-bounded but base64 decoding allocates eagerly | Cap upstream; consider streaming |
+| Very large image | **Not memory-bounded.** `ImageProcessingService.decodeToRgbMatrix` allocates eagerly in three stages **before** the 512-px cap fires: full base64 byte array → `ImageIO.read` into a `BufferedImage` → `bufferedImageToRgbMatrix` builds an `int[height][width][3]` of the original (pre-downscale) dimensions. A multi-thousand-pixel input therefore consumes ~`12·W·H` bytes plus the `BufferedImage` and base64 buffer, all on the request thread's heap. Heap OOM and DoS are possible. | Cap dimensions or payload size at the HTTP boundary (e.g. reverse proxy `client_max_body_size`, an upstream image-resize step, or pre-decoding the magic-bytes header and short-circuiting before `ImageIO.read`); consider streaming-decode in `ImageProcessingService`. |
 | Long generation with `sample=true` and small graph | Walks may revisit tokens repeatedly until `max_length` | Use `sample=false` for cycle-break, or bound `max_length` |
 
 ---

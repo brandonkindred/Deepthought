@@ -289,7 +289,7 @@ sequenceDiagram
         else edge missing
             B->>B: build transient TokenWeight,<br/>weight = Random.nextDouble(),<br/>append to input_token.token_weights
             B->>TR: save(input_token)
-            TR->>N: MERGE Token + CREATE edge<br/>(OGM cascades the new TokenWeight)
+            TR->>N: upsert Token by internal id +<br/>CREATE HAS_RELATED_TOKEN edge<br/>(OGM cascades the new TokenWeight;<br/>no value-keyed MERGE — duplicate races possible)
         end
     end
     B-->>Ctl: double[][] policy
