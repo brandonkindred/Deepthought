@@ -37,6 +37,8 @@ mvn verify
 
 **Main class:** `com.deepthought.App`
 
+**Ports:** `mvn spring-boot:run` serves on **18080** (`-Dserver.port=18080` in the `spring-boot-maven-plugin` `jvmArguments` in `pom.xml`, which `apiDocsUrl` also uses), so Swagger UI is at `http://localhost:18080/swagger-ui.html`. The packaged jar and Docker (`docker-compose.yml`, `Dockerfile`) use the default **8080**.
+
 ## Project Structure
 
 ```
@@ -177,6 +179,8 @@ spring.data.neo4j.password=<password>
 ```
 
 The properties file is templated with commented-out placeholders. Neo4j must be running before starting the application.
+
+Spring also reads the connection from the environment, so `application.properties` can stay untouched: `SPRING_DATA_NEO4J_URI`, `SPRING_DATA_NEO4J_USERNAME`, `SPRING_DATA_NEO4J_PASSWORD`. The cloud dev environment sets these (password `password`) and installs Neo4j 4.4 natively, since there is no Docker daemon. Start it with `neo4j-start`, then `mvn spring-boot:run`. Neo4j 4.4 needs Java 11 (the helper handles this); the app itself builds on the default JDK.
 
 ## Code Conventions
 
