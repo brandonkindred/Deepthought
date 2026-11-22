@@ -79,73 +79,74 @@ public class Brain {
 		//Load memory from database
 		Optional<MemoryRecord> memory_record = memory_repo.findById(memory_id);
 
-		// 2a. load known action policies/probabilities for each object definition in the definition list
 		MemoryRecord memory = memory_record.get();
 
-		// 3. determine reward/regret score based on productivity status
+		//persist the feedback label on the memory record
+		Token desired_token = token_repo.findByValue(actual_token.getValue());
+		if(desired_token == null){
+			desired_token = token_repo.save(actual_token);
+		}
+		memory.setDesiredToken(desired_token);
+		memory_repo.save(memory);
+
 		//Q-LEARNING VARIABLES
 		final double learning_rate = .1;
 		final double discount_factor = .1;
+		//placeholder for estimated future reward until a real estimator exists
+		final double estimated_reward = 1.0;
 
-		//set estimated reward using prediction from memory.
+		String predicted_value = memory.getPredictedToken().getValue();
+		String actual_value = actual_token.getValue();
 
-		//replace with steps to estimate reward for an output token independent of actual desired output token
-		double estimated_reward = 1.0;
-
-		// 3. determine reward/regret score based on productivity status
-		double actual_reward = 0.0;
 		QLearn q_learn = new QLearn(learning_rate, discount_factor);
 		for(String output_key : memory.getOutputTokenKeys()){
+			boolean is_actual = output_key.equals(actual_value);
+			boolean is_predicted = output_key.equals(predicted_value);
 
-			//if predicted token is equal to output token and actual token is equal to predicted token  OR output key equals actual token key
-			if(output_key.equals(actual_token.getValue()) && actual_token.getValue().equals(memory.getPredictedToken().getValue())){
-				log.debug("REWARD   ::    2");
+			double actual_reward;
+			if(is_actual && is_predicted){
 				actual_reward = 2.0;
 			}
-			else if(output_key.equals(actual_token.getValue())){
-				log.debug("REWARD   ::   1");
+			else if(is_actual){
 				actual_reward = 1.0;
 			}
-			//if output isn't equal to the actual token or the predicted token, don't affect weights
-			else if(output_key.equals(memory.getPredictedToken().getValue()) && !output_key.equals(actual_token.getValue())){
-				log.debug("REWARD   ::     -2");
+			else if(is_predicted){
 				actual_reward = -1.0;
 			}
-			else if(!output_key.equals(actual_token.getValue())) {
-				log.debug("REWARD   ::     -1");
-				actual_reward = -2.0;
-			}
 			else {
-				log.debug("REWARD   ::    0");
-				//nothing changed so there was no reward for that combination. We want to remember this in the future
-				// so we set it to a negative value to simulate regret
-				actual_reward = 0.0;
+				//unrelated to both the prediction and the feedback, so leave its weights alone
+				continue;
 			}
+			log.debug("REWARD for output "+output_key+" :: "+actual_reward);
 
-			List<TokenWeight> token_weights = new ArrayList<TokenWeight>();
 			for(String input_key : memory.getInputTokenValues()){
-				memory.setDesiredToken(actual_token);
-				log.info("input key :: "+input_key);
-				log.info("output key :: " + output_key);
-				List<Token> tokens = token_repo.getConnectedTokens(input_key, output_key);
-				TokenWeight token_weight = null;
-				if(tokens.isEmpty()) {
-					Random random = new Random();
-					double weight = random.nextDouble();
+				TokenWeight token_weight = findWeight(input_key, output_key);
+				if(token_weight == null) {
+					token_weight = token_repo.createWeightedConnection(input_key, output_key, new Random().nextDouble());
+				}
 
-					token_weight = token_repo.createWeightedConnection(input_key, output_key, weight);
-				}
-				else {
-					token_weight = tokens.get(0).getTokenWeights().get(0);
-				}
-				double q_learn_val = Math.abs(q_learn.calculate(token_weight.getWeight(), actual_reward, estimated_reward ));
-				//updated token weight with q_learn_val
+				//keep weights within the documented 0.0-1.0 range
+				double q_learn_val = q_learn.calculate(token_weight.getWeight(), actual_reward, estimated_reward);
+				q_learn_val = Math.max(0.0, Math.min(1.0, q_learn_val));
 				token_weight.setWeight(q_learn_val);
-				token_weights.add(token_weight);
-				log.debug("token ::    " + token_weight.getToken().getValue() + "  :::   " + token_weight.getWeight());
+				log.debug("edge "+input_key+" -> "+output_key+" :: "+q_learn_val);
 				token_weight_repo.save(token_weight);
 			}
 		}
+	}
+
+	/**
+	 * Finds the specific edge between an input and output token value, or null if none exists
+	 */
+	private TokenWeight findWeight(String input_key, String output_key){
+		for(Token token : token_repo.getConnectedTokens(input_key, output_key)){
+			for(TokenWeight weight : token.getTokenWeights()){
+				if(weight.getEndToken() != null && output_key.equals(weight.getEndToken().getValue())){
+					return weight;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
