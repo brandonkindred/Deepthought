@@ -158,7 +158,8 @@ but kept explicit).
 
 - Learning rate: 0.1
 - Discount factor: 0.1
-- Reward structure: +2 (exact match), +1 (partial match), -1 (wrong prediction), -2 (unrelated)
+- Reward structure (per output token): +2 (predicted and actual), +1 (actual but not predicted), -1 (predicted but not actual). Outputs that are neither are skipped
+- Updated weights are clamped to [0.0, 1.0]
 
 ## API Endpoints
 
